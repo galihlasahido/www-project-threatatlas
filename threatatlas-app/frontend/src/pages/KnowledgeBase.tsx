@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { frameworksApi, threatsApi, mitigationsApi } from '@/lib/api';
+import { frameworksApi, threatsApi, mitigationsApi, cwesApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +48,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Library, AlertTriangle, Shield, Sparkles, Plus, MoreVertical, Pencil, Trash2, Search, X } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import { Library, AlertTriangle, Shield, Sparkles, Plus, MoreVertical, Pencil, Trash2, Search, X, Eye, FileText, ExternalLink, Bug } from 'lucide-react';
 
 interface Framework {
   id: number;
@@ -72,6 +79,18 @@ interface Mitigation {
   description: string;
   category: string;
   is_custom: boolean;
+}
+
+interface CWE {
+  id: number;
+  cwe_id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  severity: string | null;
+  url: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function KnowledgeBase() {
@@ -102,8 +121,32 @@ export default function KnowledgeBase() {
   const [deleteMitigationOpen, setDeleteMitigationOpen] = useState(false);
   const [mitigationToDelete, setMitigationToDelete] = useState<Mitigation | null>(null);
 
+  // Threat detail sheet state
+  const [threatDetailOpen, setThreatDetailOpen] = useState(false);
+  const [selectedThreat, setSelectedThreat] = useState<Threat | null>(null);
+  const [threatCWEs, setThreatCWEs] = useState<CWE[]>([]);
+  const [editDescription, setEditDescription] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [loadingThreatCWEs, setLoadingThreatCWEs] = useState(false);
+
+  // Mitigation detail sheet state
+  const [mitigationDetailOpen, setMitigationDetailOpen] = useState(false);
+  const [selectedMitigation, setSelectedMitigation] = useState<Mitigation | null>(null);
+  const [editMitigationDescription, setEditMitigationDescription] = useState('');
+  const [savingMitigationDescription, setSavingMitigationDescription] = useState(false);
+
+  // CWE tab state
+  const [cwes, setCWEs] = useState<CWE[]>([]);
+  const [cweSearch, setCweSearch] = useState('');
+  const [selectedCWE, setSelectedCWE] = useState<CWE | null>(null);
+  const [cweDetailOpen, setCweDetailOpen] = useState(false);
+  const [cweThreatLinks, setCweThreatLinks] = useState<Threat[]>([]);
+  const [loadingCWEs, setLoadingCWEs] = useState(false);
+  const [loadingCweThreats, setLoadingCweThreats] = useState(false);
+
   useEffect(() => {
     loadFrameworks();
+    loadCWEs();
   }, []);
 
   useEffect(() => {
@@ -147,6 +190,18 @@ export default function KnowledgeBase() {
       setMitigations(response.data);
     } catch (error) {
       console.error('Error loading mitigations:', error);
+    }
+  };
+
+  const loadCWEs = async () => {
+    try {
+      setLoadingCWEs(true);
+      const response = await cwesApi.list();
+      setCWEs(response.data);
+    } catch (error) {
+      console.error('Error loading CWEs:', error);
+    } finally {
+      setLoadingCWEs(false);
     }
   };
 
@@ -215,6 +270,45 @@ export default function KnowledgeBase() {
     setThreatDialogOpen(true);
   };
 
+  // Threat detail sheet handlers
+  const handleOpenThreatDetail = async (threat: Threat) => {
+    setSelectedThreat(threat);
+    setEditDescription(threat.description || '');
+    setThreatDetailOpen(true);
+    setLoadingThreatCWEs(true);
+    try {
+      const response = await cwesApi.getForThreat(threat.id);
+      setThreatCWEs(response.data);
+    } catch (error) {
+      console.error('Error loading CWEs for threat:', error);
+      setThreatCWEs([]);
+    } finally {
+      setLoadingThreatCWEs(false);
+    }
+  };
+
+  const handleSaveThreatDescription = async () => {
+    if (!selectedThreat) return;
+    setSavingDescription(true);
+    try {
+      await threatsApi.update(selectedThreat.id, { description: editDescription });
+      // Update local state
+      setThreats(prev => prev.map(t => t.id === selectedThreat.id ? { ...t, description: editDescription } : t));
+      setSelectedThreat({ ...selectedThreat, description: editDescription });
+    } catch (error) {
+      console.error('Error saving threat description:', error);
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  // Related mitigations for a threat (same framework + category)
+  const getRelatedMitigations = (threat: Threat) => {
+    return mitigations.filter(
+      m => m.framework_id === threat.framework_id && m.category === threat.category
+    );
+  };
+
   // Mitigation handlers
   const handleCreateMitigation = async () => {
     if (!selectedFramework) return;
@@ -280,6 +374,63 @@ export default function KnowledgeBase() {
     setMitigationDialogOpen(true);
   };
 
+  // Mitigation detail sheet handlers
+  const handleOpenMitigationDetail = async (mitigation: Mitigation) => {
+    setSelectedMitigation(mitigation);
+    setEditMitigationDescription(mitigation.description || '');
+    setMitigationDetailOpen(true);
+  };
+
+  const handleSaveMitigationDescription = async () => {
+    if (!selectedMitigation) return;
+    setSavingMitigationDescription(true);
+    try {
+      await mitigationsApi.update(selectedMitigation.id, { description: editMitigationDescription });
+      setMitigations(prev => prev.map(m => m.id === selectedMitigation.id ? { ...m, description: editMitigationDescription } : m));
+      setSelectedMitigation({ ...selectedMitigation, description: editMitigationDescription });
+    } catch (error) {
+      console.error('Error saving mitigation description:', error);
+    } finally {
+      setSavingMitigationDescription(false);
+    }
+  };
+
+  // Related threats for a mitigation (same framework + category)
+  const getRelatedThreats = (mitigation: Mitigation) => {
+    return threats.filter(
+      t => t.framework_id === mitigation.framework_id && t.category === mitigation.category
+    );
+  };
+
+  // CWE detail handler
+  const handleOpenCweDetail = async (cwe: CWE) => {
+    setSelectedCWE(cwe);
+    setCweDetailOpen(true);
+    setLoadingCweThreats(true);
+    try {
+      // Find threats linked to this CWE by checking each threat's CWEs
+      // We'll use a simpler approach: check all threats loaded for the selected framework
+      const linkedThreats: Threat[] = [];
+      for (const threat of threats) {
+        try {
+          const resp = await cwesApi.getForThreat(threat.id);
+          const threatCweIds = resp.data.map((c: CWE) => c.id);
+          if (threatCweIds.includes(cwe.id)) {
+            linkedThreats.push(threat);
+          }
+        } catch {
+          // skip
+        }
+      }
+      setCweThreatLinks(linkedThreats);
+    } catch (error) {
+      console.error('Error loading threats for CWE:', error);
+      setCweThreatLinks([]);
+    } finally {
+      setLoadingCweThreats(false);
+    }
+  };
+
   // Unique categories (for filter selects and create/edit forms)
   const threatCategories = Array.from(new Set(threats.map(t => t.category).filter(Boolean))).sort();
   const mitigationCategories = Array.from(new Set(mitigations.map(m => m.category).filter(Boolean))).sort();
@@ -302,6 +453,35 @@ export default function KnowledgeBase() {
     const matchesCategory = mitigationCategoryFilter === 'all' || m.category === mitigationCategoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  // CWE filtered list
+  const filteredCWEs = cwes.filter(c => {
+    if (!cweSearch) return true;
+    const search = cweSearch.toLowerCase();
+    return (
+      c.cwe_id.toLowerCase().includes(search) ||
+      c.name.toLowerCase().includes(search) ||
+      (c.category && c.category.toLowerCase().includes(search)) ||
+      (c.description && c.description.toLowerCase().includes(search))
+    );
+  });
+
+  // Helper to get framework name
+  const getFrameworkName = (frameworkId: number) => {
+    const fw = frameworks.find(f => f.id === frameworkId);
+    return fw ? fw.name : 'Unknown';
+  };
+
+  // Severity color helper
+  const getSeverityColor = (severity: string | null) => {
+    switch (severity?.toLowerCase()) {
+      case 'critical': return 'bg-red-100 text-red-800 border-red-200';
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
 
   return (
     <div className="flex-1 space-y-6 mx-auto p-4">
@@ -358,9 +538,9 @@ export default function KnowledgeBase() {
             })}
           </div>
 
-          {/* Threats and Mitigations Tabs */}
+          {/* Threats, Mitigations, and CWEs Tabs */}
           <Tabs defaultValue="threats" className="w-full space-y-4">
-            <TabsList className="grid w-full max-w-[420px] grid-cols-2 h-11 p-1 rounded-xl shadow-sm">
+            <TabsList className="grid w-full max-w-[630px] grid-cols-3 h-11 p-1 rounded-xl shadow-sm">
                   <TabsTrigger value="threats" className="gap-2 rounded-lg font-semibold transition-all duration-200 data-[state=active]:shadow-sm">
                     <AlertTriangle className="h-4 w-4" />
                     Threats ({threats.length})
@@ -368,6 +548,10 @@ export default function KnowledgeBase() {
                   <TabsTrigger value="mitigations" className="gap-2 rounded-lg font-semibold transition-all duration-200 data-[state=active]:shadow-sm">
                     <Shield className="h-4 w-4" />
                     Mitigations ({mitigations.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="cwes" className="gap-2 rounded-lg font-semibold transition-all duration-200 data-[state=active]:shadow-sm">
+                    <Bug className="h-4 w-4" />
+                    CWEs ({cwes.length})
                   </TabsTrigger>
             </TabsList>
 
@@ -488,12 +672,13 @@ export default function KnowledgeBase() {
                           {filteredThreats.map((threat, index) => (
                             <TableRow
                               key={threat.id}
-                              className="hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0"
+                              className="hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0 cursor-pointer"
                               style={{
                                 animation: 'fadeIn 0.3s ease-out forwards',
                                 animationDelay: `${index * 30}ms`,
                                 opacity: 0
                               }}
+                              onClick={() => handleOpenThreatDetail(threat)}
                             >
                               <TableCell>
                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500/10 to-orange-500/5 shadow-sm">
@@ -513,27 +698,40 @@ export default function KnowledgeBase() {
                                   {threat.is_custom ? 'Custom' : 'Predefined'}
                                 </Badge>
                               </TableCell>
-                              <TableCell>
-                                {threat.is_custom && canWrite && (
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                {canWrite && (
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted transition-all rounded-lg">
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                      <DropdownMenuItem onClick={() => openThreatDialog(threat)} className="cursor-pointer">
-                                        <Pencil className="mr-2 h-4 w-4" />
-                                        Edit
+                                    <DropdownMenuContent align="end" className="w-48">
+                                      <DropdownMenuItem onClick={() => handleOpenThreatDetail(threat)} className="cursor-pointer">
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View Details
                                       </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={() => openDeleteThreatDialog(threat)}
-                                        className="text-destructive cursor-pointer focus:text-destructive"
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete
-                                      </DropdownMenuItem>
+                                      {threat.is_custom ? (
+                                        <>
+                                          <DropdownMenuItem onClick={() => openThreatDialog(threat)} className="cursor-pointer">
+                                            <Pencil className="mr-2 h-4 w-4" />
+                                            Edit
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={() => openDeleteThreatDialog(threat)}
+                                            className="text-destructive cursor-pointer focus:text-destructive"
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </>
+                                      ) : (
+                                        <DropdownMenuItem onClick={() => handleOpenThreatDetail(threat)} className="cursor-pointer">
+                                          <FileText className="mr-2 h-4 w-4" />
+                                          Edit Description
+                                        </DropdownMenuItem>
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 )}
@@ -664,12 +862,13 @@ export default function KnowledgeBase() {
                           {filteredMitigations.map((mitigation, index) => (
                             <TableRow
                               key={mitigation.id}
-                              className="hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0"
+                              className="hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0 cursor-pointer"
                               style={{
                                 animation: 'fadeIn 0.3s ease-out forwards',
                                 animationDelay: `${index * 30}ms`,
                                 opacity: 0
                               }}
+                              onClick={() => handleOpenMitigationDetail(mitigation)}
                             >
                               <TableCell>
                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 shadow-sm">
@@ -689,29 +888,170 @@ export default function KnowledgeBase() {
                                   {mitigation.is_custom ? 'Custom' : 'Predefined'}
                                 </Badge>
                               </TableCell>
-                              <TableCell>
-                                {mitigation.is_custom && canWrite && (
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                {canWrite && (
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted transition-all rounded-lg">
                                         <MoreVertical className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                      <DropdownMenuItem onClick={() => openMitigationDialog(mitigation)} className="cursor-pointer">
-                                        <Pencil className="mr-2 h-4 w-4" />
-                                        Edit
+                                    <DropdownMenuContent align="end" className="w-48">
+                                      <DropdownMenuItem onClick={() => handleOpenMitigationDetail(mitigation)} className="cursor-pointer">
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View Details
                                       </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={() => openDeleteMitigationDialog(mitigation)}
-                                        className="text-destructive cursor-pointer focus:text-destructive"
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete
-                                      </DropdownMenuItem>
+                                      {mitigation.is_custom ? (
+                                        <>
+                                          <DropdownMenuItem onClick={() => openMitigationDialog(mitigation)} className="cursor-pointer">
+                                            <Pencil className="mr-2 h-4 w-4" />
+                                            Edit
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={() => openDeleteMitigationDialog(mitigation)}
+                                            className="text-destructive cursor-pointer focus:text-destructive"
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </>
+                                      ) : (
+                                        <DropdownMenuItem onClick={() => handleOpenMitigationDetail(mitigation)} className="cursor-pointer">
+                                          <FileText className="mr-2 h-4 w-4" />
+                                          Edit Description
+                                        </DropdownMenuItem>
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+            </TabsContent>
+
+            {/* CWEs Tab */}
+            <TabsContent value="cwes" className="space-y-3 animate-fadeIn">
+                {/* Filter bar */}
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search CWEs by ID, name, or category..."
+                      value={cweSearch}
+                      onChange={(e) => setCweSearch(e.target.value)}
+                      className="pl-9 rounded-lg border-border/60"
+                    />
+                    {cweSearch && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 rounded-md"
+                        onClick={() => setCweSearch('')}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Active filter chips */}
+                {cweSearch && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground font-medium">Filters:</span>
+                    <button
+                      onClick={() => setCweSearch('')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                    >
+                      "{cweSearch}"
+                      <X className="h-3 w-3" />
+                    </button>
+                    <span className="text-xs text-muted-foreground">
+                      — {filteredCWEs.length} result{filteredCWEs.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+
+                {loadingCWEs ? (
+                  <Card className="border-dashed rounded-xl animate-pulse">
+                    <CardContent className="flex items-center justify-center p-16">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                        <p className="text-sm text-muted-foreground font-medium">Loading CWEs...</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : cwes.length === 0 ? (
+                  <Card className="border-dashed border-2 rounded-xl">
+                    <CardContent className="flex flex-col items-center justify-center p-16">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 mb-4 shadow-sm">
+                        <Bug className="h-8 w-8 text-purple-600" />
+                      </div>
+                      <h3 className="text-lg font-bold mb-2">No CWEs available</h3>
+                      <p className="text-sm text-muted-foreground text-center max-w-sm leading-relaxed">
+                        CWE data has not been seeded yet. CWEs are populated from MITRE data.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : filteredCWEs.length === 0 ? (
+                  <Card className="border-dashed rounded-xl">
+                    <CardContent className="flex flex-col items-center justify-center p-12">
+                      <Search className="h-8 w-8 text-muted-foreground mb-3" />
+                      <h3 className="text-base font-bold mb-1">No CWEs match your search</h3>
+                      <p className="text-sm text-muted-foreground text-center">
+                        Try adjusting your search query.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="rounded-xl border-border/60 shadow-sm overflow-hidden">
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent border-b border-border/60">
+                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead className="w-[120px] font-bold text-foreground/90">CWE ID</TableHead>
+                            <TableHead className="font-bold text-foreground/90">Name</TableHead>
+                            <TableHead className="font-bold text-foreground/90">Category</TableHead>
+                            <TableHead className="w-[100px] font-bold text-foreground/90">Severity</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredCWEs.map((cwe, index) => (
+                            <TableRow
+                              key={cwe.id}
+                              className="hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0 cursor-pointer"
+                              style={{
+                                animation: 'fadeIn 0.3s ease-out forwards',
+                                animationDelay: `${index * 30}ms`,
+                                opacity: 0
+                              }}
+                              onClick={() => handleOpenCweDetail(cwe)}
+                            >
+                              <TableCell>
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 shadow-sm">
+                                  <Bug className="h-4 w-4 text-purple-600" />
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="font-mono font-semibold shadow-sm rounded-lg">{cwe.cwe_id}</Badge>
+                              </TableCell>
+                              <TableCell className="font-semibold">{cwe.name}</TableCell>
+                              <TableCell>
+                                {cwe.category && (
+                                  <Badge variant="outline" className="font-medium shadow-sm rounded-lg">{cwe.category}</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {cwe.severity && (
+                                  <Badge className={`font-semibold shadow-sm rounded-lg border ${getSeverityColor(cwe.severity)}`}>
+                                    {cwe.severity.charAt(0).toUpperCase() + cwe.severity.slice(1)}
+                                  </Badge>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -725,6 +1065,304 @@ export default function KnowledgeBase() {
           </Tabs>
         </div>
       )}
+
+      {/* Threat Detail Sheet */}
+      <Sheet open={threatDetailOpen} onOpenChange={setThreatDetailOpen}>
+        <SheetContent className="sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-lg font-bold">{selectedThreat?.name}</SheetTitle>
+            <SheetDescription>Threat details and linked information</SheetDescription>
+          </SheetHeader>
+          {selectedThreat && (
+            <div className="space-y-6 p-4 pt-2">
+              {/* Badges row */}
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="font-medium shadow-sm rounded-lg">{selectedThreat.category}</Badge>
+                <Badge variant={selectedThreat.is_custom ? 'default' : 'secondary'} className="gap-1.5 font-semibold shadow-sm rounded-lg">
+                  {selectedThreat.is_custom && <Sparkles className="h-3 w-3" />}
+                  {selectedThreat.is_custom ? 'Custom' : 'Predefined'}
+                </Badge>
+              </div>
+
+              {/* Framework */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Framework</Label>
+                <p className="text-sm font-medium mt-1">{getFrameworkName(selectedThreat.framework_id)}</p>
+              </div>
+
+              {/* Name (editable for custom, read-only for predefined) */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Name</Label>
+                <p className="text-sm font-medium mt-1">{selectedThreat.name}</p>
+              </div>
+
+              {/* Description (editable for admin) */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Description</Label>
+                {canWrite ? (
+                  <div className="mt-1 space-y-2">
+                    <Textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={5}
+                      className="text-sm"
+                      placeholder="Enter a description..."
+                    />
+                    {editDescription !== (selectedThreat.description || '') && (
+                      <Button
+                        size="sm"
+                        onClick={handleSaveThreatDescription}
+                        disabled={savingDescription}
+                        className="font-semibold"
+                      >
+                        {savingDescription ? 'Saving...' : 'Save Description'}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm mt-1 whitespace-pre-wrap">{selectedThreat.description || 'No description provided.'}</p>
+                )}
+              </div>
+
+              {/* Linked CWEs */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Linked CWEs</Label>
+                <div className="mt-2 space-y-2">
+                  {loadingThreatCWEs ? (
+                    <p className="text-sm text-muted-foreground">Loading CWEs...</p>
+                  ) : threatCWEs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No CWEs linked to this threat.</p>
+                  ) : (
+                    threatCWEs.map((cwe) => (
+                      <div
+                        key={cwe.id}
+                        className="flex items-center gap-2 p-2 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors"
+                      >
+                        <Bug className="h-4 w-4 text-purple-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs shadow-sm rounded-lg">{cwe.cwe_id}</Badge>
+                            <span className="text-sm font-medium truncate">{cwe.name}</span>
+                          </div>
+                        </div>
+                        {cwe.severity && (
+                          <Badge className={`text-xs font-semibold shadow-sm rounded-lg border shrink-0 ${getSeverityColor(cwe.severity)}`}>
+                            {cwe.severity.charAt(0).toUpperCase() + cwe.severity.slice(1)}
+                          </Badge>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Related Mitigations */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Related Mitigations</Label>
+                <div className="mt-2 space-y-2">
+                  {(() => {
+                    const related = getRelatedMitigations(selectedThreat);
+                    if (related.length === 0) {
+                      return <p className="text-sm text-muted-foreground">No related mitigations found for this category.</p>;
+                    }
+                    return related.map((mit) => (
+                      <div
+                        key={mit.id}
+                        className="flex items-center gap-2 p-2 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setThreatDetailOpen(false);
+                          setTimeout(() => handleOpenMitigationDetail(mit), 300);
+                        }}
+                      >
+                        <Shield className="h-4 w-4 text-green-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium">{mit.name}</span>
+                          <p className="text-xs text-muted-foreground truncate">{mit.description}</p>
+                        </div>
+                        <Badge variant={mit.is_custom ? 'default' : 'secondary'} className="text-xs shrink-0 rounded-lg">
+                          {mit.is_custom ? 'Custom' : 'Predefined'}
+                        </Badge>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Mitigation Detail Sheet */}
+      <Sheet open={mitigationDetailOpen} onOpenChange={setMitigationDetailOpen}>
+        <SheetContent className="sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-lg font-bold">{selectedMitigation?.name}</SheetTitle>
+            <SheetDescription>Mitigation details and linked information</SheetDescription>
+          </SheetHeader>
+          {selectedMitigation && (
+            <div className="space-y-6 p-4 pt-2">
+              {/* Badges row */}
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="font-medium shadow-sm rounded-lg">{selectedMitigation.category}</Badge>
+                <Badge variant={selectedMitigation.is_custom ? 'default' : 'secondary'} className="gap-1.5 font-semibold shadow-sm rounded-lg">
+                  {selectedMitigation.is_custom && <Sparkles className="h-3 w-3" />}
+                  {selectedMitigation.is_custom ? 'Custom' : 'Predefined'}
+                </Badge>
+              </div>
+
+              {/* Framework */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Framework</Label>
+                <p className="text-sm font-medium mt-1">{getFrameworkName(selectedMitigation.framework_id)}</p>
+              </div>
+
+              {/* Name */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Name</Label>
+                <p className="text-sm font-medium mt-1">{selectedMitigation.name}</p>
+              </div>
+
+              {/* Description (editable for admin) */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Description</Label>
+                {canWrite ? (
+                  <div className="mt-1 space-y-2">
+                    <Textarea
+                      value={editMitigationDescription}
+                      onChange={(e) => setEditMitigationDescription(e.target.value)}
+                      rows={5}
+                      className="text-sm"
+                      placeholder="Enter a description..."
+                    />
+                    {editMitigationDescription !== (selectedMitigation.description || '') && (
+                      <Button
+                        size="sm"
+                        onClick={handleSaveMitigationDescription}
+                        disabled={savingMitigationDescription}
+                        className="font-semibold"
+                      >
+                        {savingMitigationDescription ? 'Saving...' : 'Save Description'}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm mt-1 whitespace-pre-wrap">{selectedMitigation.description || 'No description provided.'}</p>
+                )}
+              </div>
+
+              {/* Related Threats */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Related Threats</Label>
+                <div className="mt-2 space-y-2">
+                  {(() => {
+                    const related = getRelatedThreats(selectedMitigation);
+                    if (related.length === 0) {
+                      return <p className="text-sm text-muted-foreground">No related threats found for this category.</p>;
+                    }
+                    return related.map((thr) => (
+                      <div
+                        key={thr.id}
+                        className="flex items-center gap-2 p-2 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setMitigationDetailOpen(false);
+                          setTimeout(() => handleOpenThreatDetail(thr), 300);
+                        }}
+                      >
+                        <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium">{thr.name}</span>
+                          <p className="text-xs text-muted-foreground truncate">{thr.description}</p>
+                        </div>
+                        <Badge variant={thr.is_custom ? 'default' : 'secondary'} className="text-xs shrink-0 rounded-lg">
+                          {thr.is_custom ? 'Custom' : 'Predefined'}
+                        </Badge>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* CWE Detail Sheet */}
+      <Sheet open={cweDetailOpen} onOpenChange={setCweDetailOpen}>
+        <SheetContent className="sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-lg font-bold">{selectedCWE?.cwe_id}: {selectedCWE?.name}</SheetTitle>
+            <SheetDescription>CWE details from MITRE database</SheetDescription>
+          </SheetHeader>
+          {selectedCWE && (
+            <div className="space-y-6 p-4 pt-2">
+              {/* Badges row */}
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="font-mono font-semibold shadow-sm rounded-lg">{selectedCWE.cwe_id}</Badge>
+                {selectedCWE.category && (
+                  <Badge variant="outline" className="font-medium shadow-sm rounded-lg">{selectedCWE.category}</Badge>
+                )}
+                {selectedCWE.severity && (
+                  <Badge className={`font-semibold shadow-sm rounded-lg border ${getSeverityColor(selectedCWE.severity)}`}>
+                    {selectedCWE.severity.charAt(0).toUpperCase() + selectedCWE.severity.slice(1)}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Description</Label>
+                <p className="text-sm mt-1 whitespace-pre-wrap">{selectedCWE.description || 'No description available.'}</p>
+              </div>
+
+              {/* MITRE Link */}
+              {selectedCWE.url && (
+                <div>
+                  <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">MITRE Reference</Label>
+                  <a
+                    href={selectedCWE.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 mt-1 text-sm text-primary hover:underline font-medium"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    View on MITRE
+                  </a>
+                </div>
+              )}
+
+              {/* Linked Threats */}
+              <div>
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Linked Threats</Label>
+                <div className="mt-2 space-y-2">
+                  {loadingCweThreats ? (
+                    <p className="text-sm text-muted-foreground">Loading linked threats...</p>
+                  ) : cweThreatLinks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No threats are linked to this CWE.</p>
+                  ) : (
+                    cweThreatLinks.map((thr) => (
+                      <div
+                        key={thr.id}
+                        className="flex items-center gap-2 p-2 rounded-lg border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setCweDetailOpen(false);
+                          setTimeout(() => handleOpenThreatDetail(thr), 300);
+                        }}
+                      >
+                        <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium">{thr.name}</span>
+                          <p className="text-xs text-muted-foreground truncate">{thr.description}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs shrink-0 rounded-lg">{thr.category}</Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Threat Dialog */}
       <Dialog open={threatDialogOpen} onOpenChange={setThreatDialogOpen}>
