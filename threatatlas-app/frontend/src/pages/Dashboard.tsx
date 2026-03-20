@@ -12,8 +12,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, AlertTriangle, Shield, TrendingUp, CheckCircle2, Activity, Link2, Box, Grid3x3, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, AlertTriangle, Shield, TrendingUp, CheckCircle2, Activity, Link2, Box, Grid3x3, ExternalLink, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
 import ThreatDetailsSheet from '@/components/ThreatDetailsSheet';
+import { CVEDashboardWidget } from '@/components/CVEDashboardWidget';
+import { VulnerabilitiesTab } from '@/components/VulnerabilitiesTab';
 import { getSeverityClasses, getSeverityStripeClass, getStatusClasses } from '@/lib/risk';
 import { cn } from '@/lib/utils';
 
@@ -308,9 +311,21 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       ) : (
-          <>
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="overview">
+                <AlertTriangle className="h-4 w-4 mr-1.5" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="vulnerabilities">
+                <ShieldAlert className="h-4 w-4 mr-1.5" />
+                Vulnerabilities
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {stats.map((stat, index) => (
                 <Card
                   key={stat.title}
@@ -336,6 +351,7 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
               ))}
+              <CVEDashboardWidget productIds={products.map((p: any) => p.id)} />
             </div>
 
             {/* Filters */}
@@ -714,7 +730,12 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-        </>
+            </TabsContent>
+
+            <TabsContent value="vulnerabilities" className="space-y-6">
+              <VulnerabilitiesTab products={products} />
+            </TabsContent>
+          </Tabs>
       )}
 
       {/* Threat Details Sheet */}

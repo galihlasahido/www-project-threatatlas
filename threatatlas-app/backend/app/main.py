@@ -23,6 +23,9 @@ from app.routers import (
     diagram_versions,
     invitations,
     collaborators,
+    cwes,
+    cves,
+    technology_stacks,
 )
 
 
@@ -64,6 +67,11 @@ app.include_router(diagram_mitigations.router, prefix="/api")
 app.include_router(diagram_versions.router, prefix="/api")
 app.include_router(invitations.router, prefix="/api")
 app.include_router(collaborators.router, prefix="/api")
+app.include_router(cwes.router, prefix="/api")
+app.include_router(cwes.threat_cwe_router, prefix="/api")
+app.include_router(cves.router, prefix="/api")
+app.include_router(cves.diagram_cve_router, prefix="/api")
+app.include_router(technology_stacks.router, prefix="/api")
 
 
 @app.get("/")

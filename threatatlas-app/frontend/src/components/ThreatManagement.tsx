@@ -41,6 +41,7 @@ import {
 import { AlertTriangle, Plus, Trash2, Search, X, Shield, ChevronDown } from 'lucide-react';
 import { RiskSelector } from '@/components/RiskSelector';
 import { getSeverityVariant } from '@/lib/risk';
+import { CWEPanel } from '@/components/CWEPanel';
 
 interface Threat {
   id: number;
@@ -381,6 +382,7 @@ export default function ThreatManagement({ diagramId, activeModelId, modelFramew
                           <p className="text-sm text-muted-foreground">
                             {dt.threat.description}
                           </p>
+                          <CWEPanel threatId={dt.threat_id} compact />
                         </button>
                       </CollapsibleTrigger>
                       <Button

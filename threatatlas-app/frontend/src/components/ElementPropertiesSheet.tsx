@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import ThreatManagement from '@/components/ThreatManagement';
+import { TechnologyStackEditor } from '@/components/TechnologyStackEditor';
 
 interface ElementPropertiesSheetProps {
   open: boolean;
@@ -110,6 +111,20 @@ export default function ElementPropertiesSheet({
                 </div>
               </div>
             </div>
+
+            <div className="h-px bg-border" />
+
+            {/* Technology Stack Section */}
+            {diagramId && selectedElement && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Technology Stack</h3>
+                <TechnologyStackEditor
+                  diagramId={diagramId}
+                  elementId={selectedElement.id}
+                  elementLabel={selectedElement.label || ''}
+                />
+              </div>
+            )}
 
             <div className="h-px bg-border" />
 

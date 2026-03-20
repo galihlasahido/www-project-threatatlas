@@ -28,3 +28,4 @@ class Diagram(Base):
     diagram_threats = relationship("DiagramThreat", back_populates="diagram", cascade="all, delete-orphan")
     diagram_mitigations = relationship("DiagramMitigation", back_populates="diagram", cascade="all, delete-orphan")
     versions = relationship("DiagramVersion", back_populates="diagram", cascade="all, delete-orphan")
+    technology_stacks = relationship("TechnologyStack", back_populates="diagram", cascade="all, delete-orphan")

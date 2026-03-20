@@ -17,13 +17,17 @@ api.interceptors.request.use((config) => {
   }
 
   // Add trailing slash to URL if not present (prevents 307 redirects from FastAPI)
-  if (config.url && !config.url.endsWith('/') && !config.url.includes('?')) {
-    config.url = `${config.url}/`;
-  } else if (config.url && !config.url.endsWith('/') && config.url.includes('?')) {
-    // Handle URLs with query parameters
-    const [path, query] = config.url.split('?');
-    if (!path.endsWith('/')) {
-      config.url = `${path}/?${query}`;
+  // Skip for DELETE/PUT/PATCH — browsers may not preserve method on 307 redirects
+  const method = (config.method || 'get').toLowerCase();
+  if (method === 'get' || method === 'post') {
+    if (config.url && !config.url.endsWith('/') && !config.url.includes('?')) {
+      config.url = `${config.url}/`;
+    } else if (config.url && !config.url.endsWith('/') && config.url.includes('?')) {
+      // Handle URLs with query parameters
+      const [path, query] = config.url.split('?');
+      if (!path.endsWith('/')) {
+        config.url = `${path}/?${query}`;
+      }
     }
   }
 
@@ -134,6 +138,37 @@ export const collaboratorsApi = {
     api.put(`/products/${productId}/collaborators/${userId}`, data),
   remove: (productId: number, userId: number) =>
     api.delete(`/products/${productId}/collaborators/${userId}`),
+};
+
+// CWE API
+export const cwesApi = {
+  list: (params?: { search?: string; category?: string }) => api.get('/cwes', { params }),
+  get: (id: number) => api.get(`/cwes/${id}`),
+  getCVEs: (id: number) => api.get(`/cwes/${id}/cves`),
+  getForThreat: (threatId: number) => api.get(`/threats/${threatId}/cwes`),
+  linkToThreat: (threatId: number, cweId: number) => api.post(`/threats/${threatId}/cwes`, { cwe_id: cweId }),
+  unlinkFromThreat: (threatId: number, cweId: number) => api.delete(`/threats/${threatId}/cwes/${cweId}`),
+};
+
+// CVE API
+export const cvesApi = {
+  list: (params?: { keyword?: string; cwe_id?: string; severity?: string; vendor?: string; product?: string; limit?: number; offset?: number }) => api.get('/cves', { params }),
+  get: (cveId: string) => api.get(`/cves/${cveId}`),
+  search: (params: { keyword?: string; cwe_id?: string; vendor?: string; product?: string; version?: string; severity?: string; fetch_from_nvd?: boolean }) => api.post('/cves/search', params),
+  byTechnology: (params: { vendor?: string; product: string; version?: string }) => api.get('/cves/by-technology', { params }),
+  forDiagram: (diagramId: number) => api.get(`/diagrams/${diagramId}/cves`),
+  forProduct: (productId: number) => api.get(`/products/${productId}/cves`),
+  summary: (productIds?: number[]) => api.get('/cves/summary', { params: productIds ? { product_ids: productIds.join(',') } : {} }),
+};
+
+// Technology Stack API
+export const technologyStacksApi = {
+  listForDiagram: (diagramId: number) => api.get(`/diagrams/${diagramId}/technology-stacks`),
+  listForElement: (diagramId: number, elementId: string) => api.get(`/diagrams/${diagramId}/elements/${elementId}/technology-stacks`),
+  create: (diagramId: number, data: { element_id: string; technology_name: string; version?: string; vendor?: string }) => api.post(`/diagrams/${diagramId}/technology-stacks`, data),
+  update: (id: number, data: { technology_name?: string; version?: string; vendor?: string }) => api.put(`/technology-stacks/${id}`, data),
+  delete: (id: number) => api.delete(`/technology-stacks/${id}`),
+  getCVEs: (id: number) => api.get(`/technology-stacks/${id}/cves`),
 };
 
 export default api;

@@ -231,6 +231,10 @@ export default function ModelSelector({ diagramId, selectedModelId, onModelChang
 
   const selectedModel = models.find(m => m.id === selectedModelId);
 
+  // Filter out frameworks that already have a model for this diagram
+  const usedFrameworkIds = new Set(models.map(m => m.framework_id));
+  const availableFrameworks = frameworks.filter(f => !usedFrameworkIds.has(f.id));
+
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2">
@@ -327,11 +331,17 @@ export default function ModelSelector({ diagramId, selectedModelId, onModelChang
                   <SelectValue placeholder="Select a framework" />
                 </SelectTrigger>
                 <SelectContent>
-                  {frameworks.map((framework) => (
-                    <SelectItem key={framework.id} value={framework.id.toString()}>
-                      {framework.name}
+                  {availableFrameworks.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      All frameworks already in use
                     </SelectItem>
-                  ))}
+                  ) : (
+                    availableFrameworks.map((framework) => (
+                      <SelectItem key={framework.id} value={framework.id.toString()}>
+                        {framework.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </Field>

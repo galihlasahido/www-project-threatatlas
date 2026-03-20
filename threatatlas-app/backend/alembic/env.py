@@ -17,6 +17,12 @@ from app.models import (
     DiagramThreat,
     Mitigation,
     DiagramMitigation,
+    CWE,
+    ThreatCWE,
+    CVE,
+    CVECWE,
+    CVECPE,
+    TechnologyStack,
 )
 
 # this is the Alembic Config object, which provides

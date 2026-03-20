@@ -43,10 +43,33 @@ const nodeStyles = {
   },
 };
 
+function TechPills({ technologies }: { technologies?: Array<{ technology_name: string }> }) {
+  if (!technologies || technologies.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-0.5 justify-center mt-0.5 max-w-[100px]">
+      {technologies.slice(0, 3).map((tech, i) => (
+        <span
+          key={i}
+          className="text-[7px] leading-tight px-1 py-0 rounded bg-primary/10 text-primary truncate max-w-[60px]"
+          title={tech.technology_name}
+        >
+          {tech.technology_name}
+        </span>
+      ))}
+      {technologies.length > 3 && (
+        <span className="text-[7px] leading-tight px-1 py-0 rounded bg-muted text-muted-foreground">
+          +{technologies.length - 3}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function DiagramNode({ data, selected }: NodeProps) {
   const nodeType = (data.type as keyof typeof nodeStyles) || 'process';
   const style = nodeStyles[nodeType];
   const Icon = style.icon;
+  const technologies = data.technologies as Array<{ technology_name: string }> | undefined;
 
   // Process - Circle (DFD standard)
   if (style.shape === 'circle') {
@@ -113,6 +136,7 @@ function DiagramNode({ data, selected }: NodeProps) {
           <div className={cn('font-medium text-xs text-center leading-tight', style.textColor)}>
             {data.label as string}
           </div>
+          <TechPills technologies={technologies} />
         </div>
       </div>
     );
@@ -187,6 +211,7 @@ function DiagramNode({ data, selected }: NodeProps) {
                 {data.label as string}
               </div>
             </div>
+            <TechPills technologies={technologies} />
           </div>
           {/* Bottom line */}
           <div className={cn('absolute bottom-0 left-0 right-0 h-0.5', style.border.replace('border-', 'bg-'))} />
@@ -261,6 +286,7 @@ function DiagramNode({ data, selected }: NodeProps) {
               {data.label as string}
             </div>
           </div>
+          <TechPills technologies={technologies} />
         </div>
       </div>
     );

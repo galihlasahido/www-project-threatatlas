@@ -22,6 +22,7 @@ class Threat(Base):
     # Relationships
     framework = relationship("Framework", back_populates="threats")
     diagram_threats = relationship("DiagramThreat", back_populates="threat", cascade="all, delete-orphan")
+    cwes = relationship("CWE", secondary="threat_cwes", back_populates="threats")
 
 
 class DiagramThreat(Base):

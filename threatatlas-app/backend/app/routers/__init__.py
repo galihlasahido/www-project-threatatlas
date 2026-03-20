@@ -10,6 +10,9 @@ from app.routers import (
     diagram_mitigations,
     diagram_versions,
     invitations,
+    cwes,
+    cves,
+    technology_stacks,
 )
 
 __all__ = [
@@ -24,4 +27,7 @@ __all__ = [
     "diagram_mitigations",
     "diagram_versions",
     "invitations",
+    "cwes",
+    "cves",
+    "technology_stacks",
 ]

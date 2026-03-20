@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import Framework, Mitigation, Threat
+from app.seed_cwe import seed_cwes
 
 logger = logging.getLogger(__name__)
 
@@ -619,6 +620,10 @@ def seed_knowledge_base() -> None:
         for fw in FRAMEWORKS_REGISTRY:
             _seed_framework(db, fw)
         logger.info("Knowledge base seeding complete.")
+
+        # Seed CWE data and link to threats
+        logger.info("Seeding CWE data…")
+        seed_cwes(db)
     except Exception:
         db.rollback()
         logger.exception("Knowledge base seeding failed — rolled back.")

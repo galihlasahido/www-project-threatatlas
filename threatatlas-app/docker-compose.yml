@@ -38,6 +38,7 @@ services:
       SMTP_TLS: ${SMTP_TLS:-True}
       INVITATION_EXPIRE_HOURS: ${INVITATION_EXPIRE_HOURS:-168}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      NVD_API_KEY: ${NVD_API_KEY:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

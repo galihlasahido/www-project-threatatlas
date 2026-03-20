@@ -9,6 +9,9 @@ from app.models.diagram_version import DiagramVersion, DiagramThreatVersion, Dia
 from app.models.invitation import Invitation
 from app.models.product_collaborator import ProductCollaborator
 from app.models.enums import UserRole, CollaboratorRole
+from app.models.cwe import CWE, ThreatCWE
+from app.models.cve import CVE, CVECWE, CVECPE
+from app.models.technology_stack import TechnologyStack
 
 __all__ = [
     "User",
@@ -28,4 +31,10 @@ __all__ = [
     "ProductCollaborator",
     "UserRole",
     "CollaboratorRole",
+    "CWE",
+    "ThreatCWE",
+    "CVE",
+    "CVECWE",
+    "CVECPE",
+    "TechnologyStack",
 ]

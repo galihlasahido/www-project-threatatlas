@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     invitation_expire_hours: int = 168  # 7 days
     frontend_url: str = "http://localhost:5173"
 
+    # NVD API
+    nvd_api_key: str = ""
+    nvd_api_base_url: str = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+    nvd_cache_ttl_hours: int = 24
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,
