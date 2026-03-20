@@ -28,6 +28,9 @@ from app.routers import (
     technology_stacks,
     analytics,
     reports,
+    pentests,
+    pentest_findings,
+    pentest_evidence,
 )
 
 
@@ -76,6 +79,9 @@ app.include_router(cves.diagram_cve_router, prefix="/api")
 app.include_router(technology_stacks.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+app.include_router(pentests.router, prefix="/api")
+app.include_router(pentest_findings.router, prefix="/api")
+app.include_router(pentest_evidence.router, prefix="/api")
 
 
 @app.get("/")

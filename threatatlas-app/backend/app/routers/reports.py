@@ -7,9 +7,12 @@ from app.models import (
     DiagramThreat, DiagramMitigation, Threat, Mitigation, Diagram, Product,
     Model, TechnologyStack, CVE, CVECPE, CWE, ThreatCWE,
     User as UserModel,
+    Pentest, PentestFinding, FindingCWE, FindingCVE, FindingRetest,
+    FindingEvidence,
 )
 from app.models.enums import UserRole
 from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_not_external_pentester
 from app.schemas.report import (
     ThreatModelReport,
     ExecutiveSummary,
@@ -17,6 +20,10 @@ from app.schemas.report import (
     ReportThreatItem,
     ReportMitigationItem,
     ReportCVEItem,
+    PentestReport,
+    ReportPentestSection,
+    ReportPentestFinding,
+    ReportRetestSummary,
 )
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -30,6 +37,7 @@ def get_threat_model_report(
     db: Session = Depends(get_db),
 ):
     """Generate a full threat model report for a product."""
+    require_not_external_pentester(current_user)
 
     # 1. Load product
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -272,3 +280,171 @@ def func_lower_in(db: Session, column, values: set):
     """Helper to create a case-insensitive IN filter."""
     from sqlalchemy import func
     return func.lower(column).in_(values)
+
+
+@router.get("/pentest", response_model=PentestReport)
+def get_pentest_report(
+    product_id: int = Query(..., description="Product ID (required)"),
+    pentest_id: int | None = None,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate a pentest report for a product."""
+    require_not_external_pentester(current_user)
+    from sqlalchemy import func as sa_func
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with id {product_id} not found",
+        )
+    if current_user.role != UserRole.ADMIN.value and product.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this product",
+        )
+
+    pt_query = db.query(Pentest).filter(Pentest.product_id == product_id)
+    if pentest_id is not None:
+        pt_query = pt_query.filter(Pentest.id == pentest_id)
+    pentests = pt_query.order_by(Pentest.created_at.desc()).all()
+
+    total_findings = 0
+    critical_total = 0
+    high_total = 0
+    medium_total = 0
+    low_total = 0
+    open_total = 0
+    sections = []
+
+    for pt in pentests:
+        findings = (
+            db.query(PentestFinding)
+            .filter(PentestFinding.pentest_id == pt.id)
+            .all()
+        )
+
+        finding_items = []
+        for f in findings:
+            total_findings += 1
+            sev = (f.severity or "").lower()
+            if sev == "critical":
+                critical_total += 1
+            elif sev == "high":
+                high_total += 1
+            elif sev == "medium":
+                medium_total += 1
+            elif sev == "low":
+                low_total += 1
+            if f.status in ("open", "in_progress"):
+                open_total += 1
+
+            # CWE IDs
+            cwe_links = db.query(FindingCWE).filter(FindingCWE.finding_id == f.id).all()
+            cwe_ids = []
+            for link in cwe_links:
+                cwe_obj = db.query(CWE).filter(CWE.id == link.cwe_id).first()
+                if cwe_obj:
+                    cwe_ids.append(cwe_obj.cwe_id)
+
+            # CVE IDs
+            cve_links = db.query(FindingCVE).filter(FindingCVE.finding_id == f.id).all()
+            cve_ids = []
+            for link in cve_links:
+                cve_obj = db.query(CVE).filter(CVE.id == link.cve_id).first()
+                if cve_obj:
+                    cve_ids.append(cve_obj.cve_id)
+
+            # Latest retest and retest summary
+            retests = (
+                db.query(FindingRetest)
+                .filter(FindingRetest.finding_id == f.id)
+                .order_by(FindingRetest.tested_at.desc())
+                .all()
+            )
+            latest_retest = retests[0] if retests else None
+            retest_result = latest_retest.result if latest_retest else None
+            retest_summary = ReportRetestSummary(
+                total_retests=len(retests),
+                latest_result=latest_retest.result if latest_retest else None,
+                latest_tested_at=latest_retest.tested_at if latest_retest else None,
+            ) if retests else None
+
+            # Evidence count
+            evidence_count = (
+                db.query(FindingEvidence)
+                .filter(FindingEvidence.finding_id == f.id)
+                .count()
+            )
+
+            finding_items.append(
+                ReportPentestFinding(
+                    id=f.id,
+                    title=f.title,
+                    description=f.description,
+                    severity=f.severity,
+                    category=f.category,
+                    status=f.status,
+                    affected_element=f.affected_element,
+                    steps_to_reproduce=f.steps_to_reproduce,
+                    recommendation=f.recommendation,
+                    likelihood=f.likelihood,
+                    cvss_score=f.cvss_score,
+                    cvss_vector=f.cvss_vector,
+                    risk_score=f.risk_score,
+                    remediation_priority=f.remediation_priority,
+                    due_date=f.due_date,
+                    assigned_to=f.assigned_to,
+                    evidence_count=evidence_count,
+                    retest_summary=retest_summary,
+                    cwes=cwe_ids,
+                    cves=cve_ids,
+                    latest_retest_result=retest_result,
+                )
+            )
+
+        sections.append(
+            ReportPentestSection(
+                pentest_id=pt.id,
+                pentest_name=pt.name,
+                vendor_name=pt.vendor_name,
+                vendor_type=pt.vendor_type,
+                tester_name=pt.tester_name,
+                scope=pt.scope,
+                scope_exclusions=pt.scope_exclusions,
+                tools_used=pt.tools_used,
+                methodology=pt.methodology,
+                status=pt.status,
+                started_at=pt.started_at,
+                completed_at=pt.completed_at,
+                findings=finding_items,
+            )
+        )
+
+    # Executive summary
+    if critical_total > 0:
+        risk_rating = "Critical"
+    elif high_total > 0:
+        risk_rating = "High"
+    elif medium_total > 0:
+        risk_rating = "Medium"
+    elif low_total > 0:
+        risk_rating = "Low"
+    else:
+        risk_rating = "None"
+
+    return PentestReport(
+        generated_at=datetime.now(timezone.utc),
+        product_name=product.name,
+        product_id=product.id,
+        total_pentests=len(pentests),
+        total_findings=total_findings,
+        critical_findings=critical_total,
+        high_findings=high_total,
+        medium_findings=medium_total,
+        low_findings=low_total,
+        open_findings=open_total,
+        risk_rating=risk_rating,
+        pentests=sections,
+    )

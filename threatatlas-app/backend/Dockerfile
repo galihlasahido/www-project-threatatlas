@@ -24,9 +24,10 @@ COPY . /app
 # Expose port
 EXPOSE 8000
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+# Create uploads directory and non-root user
+RUN mkdir -p /app/uploads && \
+    useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app /app/uploads
 
 USER appuser
 

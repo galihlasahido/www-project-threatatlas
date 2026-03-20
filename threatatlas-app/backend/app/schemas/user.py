@@ -44,7 +44,7 @@ class UserCreate(UserBase):
 class UserCreateByAdmin(UserBase):
     """Schema for admin creating a new user."""
     password: str
-    role: Literal['admin', 'standard', 'read_only'] = 'standard'
+    role: Literal['admin', 'standard', 'read_only', 'external_pentester'] = 'standard'
 
     @field_validator('password')
     @classmethod
@@ -72,7 +72,7 @@ class AdminUserUpdate(BaseModel):
     username: str | None = None
     full_name: str | None = None
     password: str | None = None
-    role: Literal['admin', 'standard', 'read_only'] | None = None
+    role: Literal['admin', 'standard', 'read_only', 'external_pentester'] | None = None
     is_active: bool | None = None
 
     @field_validator('password')
@@ -98,7 +98,7 @@ class User(UserBase):
     """Schema for user response."""
     id: int
     is_active: bool
-    role: Literal['admin', 'standard', 'read_only']
+    role: Literal['admin', 'standard', 'read_only', 'external_pentester']
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

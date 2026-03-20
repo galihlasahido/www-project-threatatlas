@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { productsApi, diagramsApi, diagramThreatsApi, diagramMitigationsApi, modelsApi, frameworksApi } from '@/lib/api';
+import { productsApi, diagramsApi, diagramThreatsApi, diagramMitigationsApi, modelsApi, frameworksApi, pentestsApi, pentestFindingsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,10 +28,13 @@ import {
   Plus,
   Check,
   Loader2,
+  Crosshair,
+  Bug,
 } from 'lucide-react';
 import { getSeverityClasses, getStatusClasses } from '@/lib/risk';
 import { cn } from '@/lib/utils';
 import ThreatDetailsSheet from '@/components/ThreatDetailsSheet';
+import PentestCreateDialog from '@/components/PentestCreateDialog';
 
 interface Product {
   id: number;
@@ -95,7 +98,10 @@ export default function ProductDetails() {
   const [mitigations, setMitigations] = useState<DiagramMitigation[]>([]);
   const [models, setModels] = useState<any[]>([]);
   const [frameworks, setFrameworks] = useState<any[]>([]);
+  const [pentests, setPentests] = useState<any[]>([]);
+  const [pentestFindings, setPentestFindings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newPentestOpen, setNewPentestOpen] = useState(false);
 
   // Sheet state
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -128,6 +134,17 @@ export default function ProductDetails() {
 
       setProduct(productRes.data);
       setDiagrams(diagramsRes.data);
+
+      // Load pentests and findings
+      try {
+        const pentestsRes = await pentestsApi.list({ product_id: parseInt(productId) });
+        setPentests(pentestsRes.data);
+        if (pentestsRes.data.length > 0) {
+          const findingsPromises = pentestsRes.data.map((p: any) => pentestFindingsApi.list({ pentest_id: p.id }));
+          const findingsResults = await Promise.all(findingsPromises);
+          setPentestFindings(findingsResults.flatMap(r => r.data));
+        }
+      } catch { /* pentests API might not exist yet */ }
 
       // Load threats, mitigations, models, and frameworks for all diagrams
       const diagramIds = diagramsRes.data.map((d: Diagram) => d.id);
@@ -546,6 +563,101 @@ export default function ProductDetails() {
         </CardContent>
       </Card>
 
+      {/* Pentests Section */}
+      <Card className="rounded-xl border-border/60 shadow-sm">
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Crosshair className="h-5 w-5 text-primary" />
+                Penetration Tests ({pentests.length})
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Security assessments for this product
+              </CardDescription>
+            </div>
+            <Button size="sm" onClick={() => setNewPentestOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              New Pentest
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {pentests.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm border border-dashed rounded-lg">
+              No penetration tests yet. Create one to track security assessments.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {pentests.map((pentest: any) => {
+                const findings = pentestFindings.filter((f: any) => f.pentest_id === pentest.id);
+                const criticalFindings = findings.filter((f: any) => f.severity === 'critical').length;
+                const highFindings = findings.filter((f: any) => f.severity === 'high').length;
+                const openFindings = findings.filter((f: any) => !['verified', 'closed'].includes(f.status)).length;
+
+                const statusColor = pentest.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200'
+                  : pentest.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border-blue-200'
+                  : pentest.status === 'cancelled' ? 'bg-red-100 text-red-800 border-red-200'
+                  : 'bg-gray-100 text-gray-800 border-gray-200';
+
+                return (
+                  <Card
+                    key={pentest.id}
+                    className="hover:shadow-lg hover:border-primary/30 transition-all duration-300 rounded-xl cursor-pointer group"
+                    onClick={() => navigate(`/pentests/${pentest.id}`)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 shadow-sm group-hover:shadow-md transition-all">
+                          <Crosshair className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h4 className="font-semibold text-sm truncate flex items-center gap-2">
+                              {pentest.name}
+                              <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </h4>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <Badge variant="outline" className={cn('text-xs capitalize shadow-sm border', statusColor)}>
+                              {pentest.status.replace('_', ' ')}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs shadow-sm">
+                              {pentest.vendor_type === 'external' ? '🏢 External' : '🏠 Internal'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Bug className="h-3 w-3 text-orange-600" />
+                              {findings.length} findings
+                            </span>
+                            {openFindings > 0 && (
+                              <span className="text-red-600 font-medium">{openFindings} open</span>
+                            )}
+                            {(criticalFindings > 0 || highFindings > 0) && (
+                              <span className="text-red-600 font-medium">
+                                {criticalFindings > 0 && `${criticalFindings}C`}
+                                {criticalFindings > 0 && highFindings > 0 && '/'}
+                                {highFindings > 0 && `${highFindings}H`}
+                              </span>
+                            )}
+                          </div>
+                          {pentest.vendor_name && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                              by {pentest.vendor_name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Threats & Mitigations */}
       <div className="space-y-3">
         <div className="flex items-center justify-betwee mt-4">
@@ -738,6 +850,14 @@ export default function ProductDetails() {
         onNavigateToDiagram={navigateToDiagram}
         onUpdateRisk={handleUpdateRisk}
         onMitigationsChange={loadProductData}
+      />
+
+      {/* New Pentest Dialog */}
+      <PentestCreateDialog
+        open={newPentestOpen}
+        onOpenChange={setNewPentestOpen}
+        onSuccess={loadProductData}
+        defaultProductId={product?.id}
       />
 
       {/* New Diagram Dialog (2-step) */}

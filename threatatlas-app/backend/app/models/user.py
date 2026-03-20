@@ -19,7 +19,7 @@ class User(Base):
     full_name = Column(String(200), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
-    role = Column(ENUM('admin', 'standard', 'read_only', name='userrole', create_type=False), default='standard', nullable=False)
+    role = Column(ENUM('admin', 'standard', 'read_only', 'external_pentester', name='userrole', create_type=False), default='standard', nullable=False)
     invited_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -31,3 +31,4 @@ class User(Base):
     invitations_sent = relationship("Invitation", foreign_keys="Invitation.invited_by", back_populates="invited_by_user", cascade="all, delete-orphan")
     invitation_used = relationship("Invitation", foreign_keys="Invitation.user_id", back_populates="user", uselist=False, cascade="all, delete-orphan")
     collaborations = relationship("ProductCollaborator", foreign_keys="ProductCollaborator.user_id", back_populates="user", cascade="all, delete-orphan")
+    pentest_assignments = relationship("PentestAssignment", back_populates="user", cascade="all, delete-orphan")

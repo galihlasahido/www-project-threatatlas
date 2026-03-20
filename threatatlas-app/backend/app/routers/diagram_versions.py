@@ -11,6 +11,7 @@ from app.schemas.diagram_version import (
 )
 from app.services import VersionService
 from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_not_external_pentester
 
 router = APIRouter(prefix="/diagram-versions", tags=["diagram-versions"])
 
@@ -38,6 +39,7 @@ def list_versions(
     db: Session = Depends(get_db)
 ):
     """List all versions for a diagram."""
+    require_not_external_pentester(current_user)
     # Verify diagram exists and user has access
     diagram = check_diagram_access(diagram_id, current_user.id, db)
 
@@ -63,6 +65,7 @@ def create_version(
     db: Session = Depends(get_db)
 ):
     """Manually create a version snapshot."""
+    require_not_external_pentester(current_user)
     # Get diagram and check access
     diagram = check_diagram_access(diagram_id, current_user.id, db)
 
@@ -85,6 +88,7 @@ def compare_versions(
     db: Session = Depends(get_db)
 ):
     """Compare two versions and return differences."""
+    require_not_external_pentester(current_user)
     # Verify diagram exists and user has access
     diagram = check_diagram_access(diagram_id, current_user.id, db)
 
@@ -111,6 +115,7 @@ def restore_version(
     db: Session = Depends(get_db)
 ):
     """Restore diagram to a previous version (creates new version)."""
+    require_not_external_pentester(current_user)
     # Get diagram and check access
     diagram = check_diagram_access(diagram_id, current_user.id, db)
 
@@ -136,6 +141,7 @@ def get_version(
     db: Session = Depends(get_db)
 ):
     """Get a specific version."""
+    require_not_external_pentester(current_user)
     # Check diagram access first
     check_diagram_access(diagram_id, current_user.id, db)
 
@@ -161,6 +167,7 @@ def delete_version(
     db: Session = Depends(get_db)
 ):
     """Delete a specific version."""
+    require_not_external_pentester(current_user)
     # Check diagram access first
     check_diagram_access(diagram_id, current_user.id, db)
 

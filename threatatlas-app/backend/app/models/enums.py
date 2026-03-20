@@ -9,6 +9,7 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"           # Full access: invite users, manage all resources
     STANDARD = "standard"     # Create/edit own products, diagrams, threats
     READ_ONLY = "read_only"   # View-only access to all resources
+    EXTERNAL_PENTESTER = "external_pentester"  # Access only assigned pentests
 
 
 class CollaboratorRole(str, enum.Enum):

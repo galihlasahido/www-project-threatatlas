@@ -12,6 +12,16 @@ from app.models.enums import UserRole, CollaboratorRole
 from app.models.cwe import CWE, ThreatCWE
 from app.models.cve import CVE, CVECWE, CVECPE
 from app.models.technology_stack import TechnologyStack
+from app.models.pentest import (
+    Pentest,
+    PentestFinding,
+    FindingEvidence,
+    FindingRetest,
+    FindingCWE,
+    FindingCVE,
+    FindingDiagramThreat,
+)
+from app.models.pentest_assignment import PentestAssignment
 
 __all__ = [
     "User",
@@ -37,4 +47,12 @@ __all__ = [
     "CVECWE",
     "CVECPE",
     "TechnologyStack",
+    "Pentest",
+    "PentestFinding",
+    "FindingEvidence",
+    "FindingRetest",
+    "FindingCWE",
+    "FindingCVE",
+    "FindingDiagramThreat",
+    "PentestAssignment",
 ]

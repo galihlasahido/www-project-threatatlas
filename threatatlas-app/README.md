@@ -28,3 +28,10 @@ For detailed guides, please refer to:
 - **`backend/`**: FastAPI application, PostgreSQL models, and database migrations.
 - **`frontend/`**: React application built with TypeScript, Tailwind CSS, and ReactFlow.
 - **`docs/`**: Detailed documentation for users and developers.
+
+## The default admin credentials are:
+- Email: admin@acme.com
+- Password: Admin@1234
+
+- Email: pentester@secureops.com
+- Password: Pentest@123

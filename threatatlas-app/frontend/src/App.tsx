@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/Sidebar';
 import Dashboard from '@/pages/Dashboard';
@@ -8,12 +8,14 @@ import Diagrams from '@/pages/Diagrams';
 import KnowledgeBase from '@/pages/KnowledgeBase';
 import Analytics from '@/pages/Analytics';
 import Reports from '@/pages/Reports';
+import PentestDetail from '@/pages/PentestDetail';
+import MyPentests from '@/pages/MyPentests';
 import Login from '@/pages/Login';
 import AcceptInvitation from '@/pages/AcceptInvitation';
 import UserManagement from '@/pages/UserManagement';
 import { Separator } from '@/components/ui/separator';
 import { Shield } from 'lucide-react';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 function HeaderBreadcrumb() {
@@ -23,6 +25,9 @@ function HeaderBreadcrumb() {
     if (location.pathname.startsWith('/products/')) {
       return { title: 'Product Details', subtitle: 'Security analysis & overview' };
     }
+    if (location.pathname.startsWith('/pentests/') && location.pathname !== '/pentests/') {
+      return { title: 'Pentest Detail', subtitle: 'Penetration test findings & analysis' };
+    }
     switch (location.pathname) {
       case '/': return { title: 'Dashboard', subtitle: 'Threat monitoring overview' };
       case '/products': return { title: 'Products', subtitle: 'Manage security products' };
@@ -31,6 +36,7 @@ function HeaderBreadcrumb() {
       case '/analytics': return { title: 'Analytics', subtitle: 'Threat analytics & insights' };
       case '/reports': return { title: 'Reports', subtitle: 'Generate threat model reports' };
       case '/users': return { title: 'User Management', subtitle: 'Manage users and invitations' };
+      case '/my-pentests': return { title: 'My Pentests', subtitle: 'Your assigned penetration tests' };
       default: return { title: 'ThreatAtlas', subtitle: 'Security platform' };
     }
   };
@@ -50,7 +56,16 @@ function HeaderBreadcrumb() {
   );
 }
 
+/** Redirects external pentesters away from internal-only routes. */
+function InternalOnly({ children }: { children: React.ReactNode }) {
+  const { isExternalPentester } = useAuth();
+  if (isExternalPentester) return <Navigate to="/my-pentests" replace />;
+  return <>{children}</>;
+}
+
 function AppContent() {
+  const { isExternalPentester } = useAuth();
+
   return (
     <>
       <AppSidebar />
@@ -64,14 +79,16 @@ function AppContent() {
         </header>
         <main className="flex-1 bg-gradient-to-br from-background via-muted/20 to-background">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/products/:productId" element={<ProductDetails />} />
-            <Route path="/diagrams" element={<Diagrams />} />
-            <Route path="/knowledge" element={<KnowledgeBase />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/users" element={<UserManagement />} />
+            <Route path="/" element={isExternalPentester ? <Navigate to="/my-pentests" replace /> : <Dashboard />} />
+            <Route path="/my-pentests" element={<MyPentests />} />
+            <Route path="/products" element={<InternalOnly><Products /></InternalOnly>} />
+            <Route path="/products/:productId" element={<InternalOnly><ProductDetails /></InternalOnly>} />
+            <Route path="/diagrams" element={<InternalOnly><Diagrams /></InternalOnly>} />
+            <Route path="/knowledge" element={<InternalOnly><KnowledgeBase /></InternalOnly>} />
+            <Route path="/pentests/:pentestId" element={<PentestDetail />} />
+            <Route path="/analytics" element={<InternalOnly><Analytics /></InternalOnly>} />
+            <Route path="/reports" element={<InternalOnly><Reports /></InternalOnly>} />
+            <Route path="/users" element={<InternalOnly><UserManagement /></InternalOnly>} />
           </Routes>
         </main>
       </SidebarInset>

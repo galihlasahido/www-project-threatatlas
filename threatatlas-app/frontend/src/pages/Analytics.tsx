@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { productsApi, diagramsApi, analyticsApi } from '@/lib/api';
+import { productsApi, diagramsApi, analyticsApi, pentestAnalyticsApi } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -10,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Shield, TrendingUp, Bug } from 'lucide-react';
+import { AlertTriangle, Shield, TrendingUp, Bug, Crosshair, Heart, Clock } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -67,6 +68,11 @@ export default function Analytics() {
   const [severityData, setSeverityData] = useState<any[]>([]);
   const [cveSeverityData, setCveSeverityData] = useState<any[]>([]);
   const [techVulnData, setTechVulnData] = useState<any[]>([]);
+
+  // Pentest analytics
+  const [pentestSummary, setPentestSummary] = useState<any>(null);
+  const [vendorComparison, setVendorComparison] = useState<any[]>([]);
+  const [pentestLoading, setPentestLoading] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -150,6 +156,28 @@ export default function Analytics() {
     }
   };
 
+  const loadPentestAnalytics = async () => {
+    setPentestLoading(true);
+    const params: { product_id?: number } = {};
+    if (selectedProduct !== 'all') params.product_id = Number(selectedProduct);
+    try {
+      const [summaryRes, vendorRes] = await Promise.all([
+        pentestAnalyticsApi.summary(params),
+        pentestAnalyticsApi.vendorComparison(params),
+      ]);
+      setPentestSummary(summaryRes.data || null);
+      setVendorComparison(vendorRes.data || []);
+    } catch (error) {
+      console.error('Error loading pentest analytics:', error);
+    } finally {
+      setPentestLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPentestAnalytics();
+  }, [selectedProduct]);
+
   const getRiskRating = (score: number): { label: string; color: string } => {
     if (score >= 20) return { label: 'Critical', color: 'text-red-600' };
     if (score >= 12) return { label: 'High', color: 'text-orange-600' };
@@ -218,6 +246,31 @@ export default function Analytics() {
       ]
     : [];
 
+  const pentestHealthScore = pentestSummary?.health_score ?? 0;
+  const pentestHealthColor = pentestHealthScore >= 80 ? 'text-green-600' : pentestHealthScore >= 50 ? 'text-amber-600' : 'text-red-600';
+
+  const pentestSeverityData = pentestSummary?.findings_by_severity
+    ? Object.entries(pentestSummary.findings_by_severity)
+        .map(([severity, count]) => ({ name: severity.charAt(0).toUpperCase() + severity.slice(1), value: count as number, severity }))
+        .filter((d) => d.value > 0)
+    : [];
+
+  const pentestStatusData = pentestSummary?.findings_by_status
+    ? Object.entries(pentestSummary.findings_by_status)
+        .map(([status, count]) => ({ name: status.replace('_', ' '), status, count: count as number }))
+        .filter((d) => d.count > 0)
+    : [];
+
+  const PENTEST_STATUS_COLORS: Record<string, string> = {
+    open: '#3b82f6',
+    in_progress: '#f97316',
+    patched: '#22c55e',
+    verified: '#10b981',
+    closed: '#6b7280',
+    accepted: '#eab308',
+    false_positive: '#a855f7',
+  };
+
   return (
     <div className="flex-1 space-y-6 mx-auto p-4">
       {/* Filter Bar */}
@@ -254,6 +307,20 @@ export default function Analytics() {
           </div>
         </CardContent>
       </Card>
+
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">
+            <AlertTriangle className="h-4 w-4 mr-1.5" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="pentest">
+            <Crosshair className="h-4 w-4 mr-1.5" />
+            Pentest
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
 
       {/* Stats Cards */}
       {loading ? (
@@ -451,6 +518,278 @@ export default function Analytics() {
           )}
         </ChartCard>
       </div>
+
+        </TabsContent>
+
+        {/* Pentest Analytics Tab */}
+        <TabsContent value="pentest" className="space-y-6">
+          {pentestLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i} className="rounded-xl">
+                  <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
+                  <CardContent><Skeleton className="h-8 w-16 mb-2" /><Skeleton className="h-4 w-32" /></CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : pentestSummary ? (
+            <>
+              {/* Pentest Stat Cards */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <Card className="hover:shadow-lg transition-all duration-300 rounded-xl border-border/60">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+                    <CardTitle className="text-xs font-bold text-muted-foreground tracking-wider">TOTAL FINDINGS</CardTitle>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 shadow-sm">
+                      <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{pentestSummary.total_findings ?? 0}</div>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {pentestSummary.critical_findings > 0 && <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">{pentestSummary.critical_findings} Critical</Badge>}
+                      {pentestSummary.high_findings > 0 && <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">{pentestSummary.high_findings} High</Badge>}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-all duration-300 rounded-xl border-border/60">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+                    <CardTitle className="text-xs font-bold text-muted-foreground tracking-wider">HEALTH SCORE</CardTitle>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 shadow-sm">
+                      <Heart className="h-5 w-5 text-green-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-3xl font-bold ${pentestHealthColor}`}>{Math.round(pentestHealthScore)}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">Resolution rate</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-all duration-300 rounded-xl border-border/60">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+                    <CardTitle className="text-xs font-bold text-muted-foreground tracking-wider">AVG CVSS SCORE</CardTitle>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 shadow-sm">
+                      <TrendingUp className="h-5 w-5 text-red-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const avgCvss = pentestSummary.avg_cvss_score ?? 0;
+                      const cvssColor = avgCvss >= 9 ? 'text-red-600' : avgCvss >= 7 ? 'text-orange-600' : avgCvss >= 4 ? 'text-yellow-600' : 'text-green-600';
+                      return (
+                        <>
+                          <div className={`text-3xl font-bold ${cvssColor}`}>{Number(avgCvss).toFixed(1)}</div>
+                          <p className="text-xs text-muted-foreground mt-1">Average CVSS</p>
+                        </>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-all duration-300 rounded-xl border-border/60">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+                    <CardTitle className="text-xs font-bold text-muted-foreground tracking-wider">MEAN TIME TO REMEDIATE</CardTitle>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 shadow-sm">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{pentestSummary.mean_time_to_remediate ?? 'N/A'}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Average days to fix</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-all duration-300 rounded-xl border-border/60">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+                    <CardTitle className="text-xs font-bold text-muted-foreground tracking-wider">TOTAL PENTESTS</CardTitle>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 shadow-sm">
+                      <Crosshair className="h-5 w-5 text-purple-600" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{pentestSummary.total_pentests ?? 0}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Penetration tests</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Pentest Charts */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <ChartCard title="Findings by Severity" description="Pentest finding severity distribution" loading={pentestLoading}>
+                  {pentestSeverityData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={pentestSeverityData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine
+                          label={({ name, value }) => `${name} (${value})`}
+                          outerRadius={100}
+                          dataKey="value"
+                        >
+                          {pentestSeverityData.map((entry) => (
+                            <Cell key={entry.severity} fill={SEVERITY_COLORS[entry.severity] || '#94a3b8'} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">No severity data</div>
+                  )}
+                </ChartCard>
+
+                <ChartCard title="Findings by Status" description="Current finding status distribution" loading={pentestLoading}>
+                  {pentestStatusData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={pentestStatusData}>
+                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip />
+                        <Bar dataKey="count" name="Findings" radius={[4, 4, 0, 0]}>
+                          {pentestStatusData.map((entry) => (
+                            <Cell key={entry.status} fill={PENTEST_STATUS_COLORS[entry.status] || '#94a3b8'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">No status data</div>
+                  )}
+                </ChartCard>
+
+                <ChartCard title="Vendor Comparison" description="Findings by vendor" loading={pentestLoading}>
+                  {vendorComparison.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={vendorComparison}>
+                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                        <XAxis dataKey="vendor_name" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="critical" name="Critical" fill="#ef4444" stackId="a" radius={[0, 0, 0, 0]} />
+                        <Bar dataKey="high" name="High" fill="#f97316" stackId="a" radius={[0, 0, 0, 0]} />
+                        <Bar dataKey="medium" name="Medium" fill="#eab308" stackId="a" radius={[0, 0, 0, 0]} />
+                        <Bar dataKey="low" name="Low" fill="#22c55e" stackId="a" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">No vendor data</div>
+                  )}
+                </ChartCard>
+
+                {/* Remediation Priority Breakdown */}
+                <ChartCard title="Remediation Priority" description="Findings by remediation priority" loading={pentestLoading}>
+                  {(() => {
+                    const PRIORITY_COLORS: Record<string, string> = {
+                      immediate: '#ef4444',
+                      short_term: '#f97316',
+                      long_term: '#3b82f6',
+                      accepted: '#6b7280',
+                    };
+                    const priorityData = pentestSummary?.findings_by_remediation_priority
+                      ? Object.entries(pentestSummary.findings_by_remediation_priority)
+                          .map(([priority, count]) => ({
+                            name: priority.replace('_', ' '),
+                            value: count as number,
+                            priority,
+                          }))
+                          .filter((d) => d.value > 0)
+                      : [];
+                    if (priorityData.length === 0) {
+                      return <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">No priority data</div>;
+                    }
+                    return (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie data={priorityData} cx="50%" cy="50%" labelLine label={({ name, value }) => `${name} (${value})`} outerRadius={100} dataKey="value">
+                            {priorityData.map((entry) => (
+                              <Cell key={entry.priority} fill={PRIORITY_COLORS[entry.priority] || '#94a3b8'} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    );
+                  })()}
+                </ChartCard>
+
+                {/* Risk Matrix Heatmap */}
+                <ChartCard title="Risk Matrix" description="Finding distribution by likelihood and severity" loading={pentestLoading}>
+                  {(() => {
+                    const riskData = pentestSummary?.risk_matrix;
+                    if (!riskData || riskData.length === 0) {
+                      return <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">No risk matrix data</div>;
+                    }
+                    const countMap: Record<string, number> = {};
+                    riskData.forEach((d: any) => {
+                      countMap[`${d.likelihood}-${d.severity_num}`] = d.count;
+                    });
+                    const rows = [5, 4, 3, 2, 1];
+                    const cols = [1, 2, 3, 4];
+                    const colLabels = ['Low', 'Medium', 'High', 'Critical'];
+                    const getCellColor = (likelihood: number, impact: number) => {
+                      const score = likelihood * impact;
+                      if (score >= 16) return 'bg-red-500 text-white';
+                      if (score >= 12) return 'bg-red-400 text-white';
+                      if (score >= 8) return 'bg-orange-400 text-white';
+                      if (score >= 6) return 'bg-orange-300 text-orange-900';
+                      if (score >= 4) return 'bg-yellow-300 text-yellow-900';
+                      if (score >= 2) return 'bg-yellow-200 text-yellow-800';
+                      return 'bg-green-200 text-green-800';
+                    };
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-end gap-1">
+                          <div className="w-16 flex flex-col items-center justify-center">
+                            <span className="text-xs font-semibold text-muted-foreground" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Likelihood</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="space-y-1">
+                              {rows.map((likelihood) => (
+                                <div key={likelihood} className="flex items-center gap-1">
+                                  <div className="w-8 text-center text-xs font-medium text-muted-foreground">{likelihood}</div>
+                                  {cols.map((impact) => {
+                                    const count = countMap[`${likelihood}-${impact}`] || 0;
+                                    return (
+                                      <div key={`${likelihood}-${impact}`}
+                                        className={`flex-1 h-12 flex items-center justify-center rounded-md text-sm font-bold transition-all ${getCellColor(likelihood, impact)} ${count > 0 ? 'ring-2 ring-offset-1 ring-foreground/20 shadow-md' : ''}`}
+                                      >
+                                        {count > 0 ? count : ''}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                              <div className="flex items-center gap-1">
+                                <div className="w-8" />
+                                {colLabels.map((label) => (
+                                  <div key={label} className="flex-1 text-center text-xs font-medium text-muted-foreground">{label}</div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="text-center mt-1"><span className="text-xs font-semibold text-muted-foreground">Severity</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </ChartCard>
+              </div>
+            </>
+          ) : (
+            <Card className="border-dashed rounded-xl">
+              <CardContent className="flex items-center justify-center p-12">
+                <p className="text-sm text-muted-foreground">No pentest analytics data available.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

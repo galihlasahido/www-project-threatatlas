@@ -7,7 +7,7 @@ interface User {
   username: string;
   full_name: string | null;
   is_active: boolean;
-  role: 'admin' | 'standard' | 'read_only';
+  role: 'admin' | 'standard' | 'read_only' | 'external_pentester';
   created_at: string;
 }
 
@@ -20,6 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   canWrite: boolean;
+  isExternalPentester: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = user?.role === 'admin';
   const canWrite = user?.role === 'admin' || user?.role === 'standard';
+  const isExternalPentester = user?.role === 'external_pentester';
 
   return (
     <AuthContext.Provider value={{
@@ -90,7 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!user,
       isLoading,
       isAdmin,
-      canWrite
+      canWrite,
+      isExternalPentester
     }}>
       {children}
     </AuthContext.Provider>

@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import User as UserModel
 from app.schemas.cve import CVE as CVESchema, CVEWithDetails, CVESearchParams, CVESummary
 from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_not_external_pentester
 from app.services.cve_service import cve_service
 
 router = APIRouter(prefix="/cves", tags=["cves"])
@@ -18,6 +19,7 @@ def get_vulnerability_summary(
     db: Session = Depends(get_db),
 ):
     """Get vulnerability summary for dashboard. Pass product_ids as comma-separated string."""
+    require_not_external_pentester(current_user)
     parsed_ids = None
     if product_ids:
         try:
@@ -49,6 +51,7 @@ def get_cves_by_technology(
     db: Session = Depends(get_db),
 ):
     """Get CVEs by vendor/product/version from local cache."""
+    require_not_external_pentester(current_user)
     if not product:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -72,6 +75,7 @@ def list_cves(
     db: Session = Depends(get_db),
 ):
     """List local CVEs with optional filters."""
+    require_not_external_pentester(current_user)
     return cve_service.get_local_cves(
         db,
         keyword=keyword,
@@ -91,6 +95,7 @@ def get_cve(
     db: Session = Depends(get_db),
 ):
     """Get CVE by CVE ID string (e.g., CVE-2024-1234). Fetches from NVD if not cached."""
+    require_not_external_pentester(current_user)
     cve = cve_service.sync_cve(db, cve_id_str)
     if not cve:
         raise HTTPException(
@@ -107,6 +112,7 @@ def search_cves(
     db: Session = Depends(get_db),
 ):
     """Search CVEs. If fetch_from_nvd is True, queries NVD API and caches results."""
+    require_not_external_pentester(current_user)
     if params.fetch_from_nvd:
         return cve_service.search_and_cache(
             db,
@@ -137,6 +143,7 @@ def get_diagram_cves(
     db: Session = Depends(get_db),
 ):
     """Get all CVEs for a diagram's technology stack."""
+    require_not_external_pentester(current_user)
     results = cve_service.get_cves_for_diagram(db, diagram_id)
     return [
         {
@@ -156,6 +163,7 @@ def get_product_cves(
     db: Session = Depends(get_db),
 ):
     """Get all CVEs for a product across all its diagrams."""
+    require_not_external_pentester(current_user)
     results = cve_service.get_cves_for_product(db, product_id)
     return [
         {

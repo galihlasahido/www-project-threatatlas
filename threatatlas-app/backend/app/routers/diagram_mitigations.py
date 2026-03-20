@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models import DiagramMitigation as DiagramMitigationModel, Diagram as DiagramModel, Mitigation as MitigationModel, User as UserModel, Model as ModelDB
 from app.schemas import DiagramMitigation, DiagramMitigationCreate, DiagramMitigationUpdate, DiagramMitigationWithDetails
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import require_resource_access, require_standard_or_admin
+from app.auth.permissions import require_resource_access, require_standard_or_admin, require_not_external_pentester
 from app.models.enums import UserRole
 
 router = APIRouter(prefix="/diagram-mitigations", tags=["diagram-mitigations"])
@@ -22,6 +22,7 @@ def list_diagram_mitigations(
     db: Session = Depends(get_db)
 ):
     """List all diagram mitigations, optionally filtered by diagram, model, or element."""
+    require_not_external_pentester(current_user)
     query = db.query(DiagramMitigationModel).options(
         joinedload(DiagramMitigationModel.mitigation),
         joinedload(DiagramMitigationModel.diagram).joinedload(DiagramModel.product)
@@ -50,6 +51,7 @@ def get_diagram_mitigation(
     db: Session = Depends(get_db)
 ):
     """Get a diagram mitigation by ID."""
+    require_not_external_pentester(current_user)
     diagram_mitigation = db.query(DiagramMitigationModel).options(
         joinedload(DiagramMitigationModel.mitigation),
         joinedload(DiagramMitigationModel.diagram).joinedload(DiagramModel.product)

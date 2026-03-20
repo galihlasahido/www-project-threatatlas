@@ -23,6 +23,13 @@ from app.models import (
     CVECWE,
     CVECPE,
     TechnologyStack,
+    Pentest,
+    PentestFinding,
+    FindingEvidence,
+    FindingRetest,
+    FindingCWE,
+    FindingCVE,
+    FindingDiagramThreat,
 )
 
 # this is the Alembic Config object, which provides

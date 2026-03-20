@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models import DiagramThreat as DiagramThreatModel, Diagram as DiagramModel, Threat as ThreatModel, User as UserModel, Model as ModelDB
 from app.schemas import DiagramThreat, DiagramThreatCreate, DiagramThreatUpdate, DiagramThreatWithDetails
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import require_resource_access, require_standard_or_admin
+from app.auth.permissions import require_resource_access, require_standard_or_admin, require_not_external_pentester
 from app.models.enums import UserRole
 
 router = APIRouter(prefix="/diagram-threats", tags=["diagram-threats"])
@@ -41,6 +41,7 @@ def list_diagram_threats(
     db: Session = Depends(get_db)
 ):
     """List all diagram threats, optionally filtered by diagram, model, or element."""
+    require_not_external_pentester(current_user)
     query = db.query(DiagramThreatModel).options(
         joinedload(DiagramThreatModel.threat),
         joinedload(DiagramThreatModel.diagram).joinedload(DiagramModel.product)
@@ -69,6 +70,7 @@ def get_diagram_threat(
     db: Session = Depends(get_db)
 ):
     """Get a diagram threat by ID."""
+    require_not_external_pentester(current_user)
     diagram_threat = db.query(DiagramThreatModel).options(
         joinedload(DiagramThreatModel.threat),
         joinedload(DiagramThreatModel.diagram).joinedload(DiagramModel.product)

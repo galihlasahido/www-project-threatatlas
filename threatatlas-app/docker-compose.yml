@@ -39,6 +39,8 @@ services:
       INVITATION_EXPIRE_HOURS: ${INVITATION_EXPIRE_HOURS:-168}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       NVD_API_KEY: ${NVD_API_KEY:-}
+    volumes:
+      - uploads_data:/app/uploads
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -71,6 +73,7 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
 
 networks:
   threatatlas-network:

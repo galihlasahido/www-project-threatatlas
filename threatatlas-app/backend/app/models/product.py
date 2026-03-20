@@ -21,3 +21,4 @@ class Product(Base):
     user = relationship("User", back_populates="products")
     diagrams = relationship("Diagram", back_populates="product", cascade="all, delete-orphan")
     collaborators = relationship("ProductCollaborator", back_populates="product", cascade="all, delete-orphan")
+    pentests = relationship("Pentest", back_populates="product", cascade="all, delete-orphan")

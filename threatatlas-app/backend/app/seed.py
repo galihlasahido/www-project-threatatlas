@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import Framework, Mitigation, Threat
 from app.seed_cwe import seed_cwes
+from app.seed_pentests import seed_pentests
 
 logger = logging.getLogger(__name__)
 
@@ -624,6 +625,10 @@ def seed_knowledge_base() -> None:
         # Seed CWE data and link to threats
         logger.info("Seeding CWE data…")
         seed_cwes(db)
+
+        # Seed pentest data
+        logger.info("Seeding pentest data…")
+        seed_pentests(db)
     except Exception:
         db.rollback()
         logger.exception("Knowledge base seeding failed — rolled back.")

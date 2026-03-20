@@ -6,7 +6,7 @@ from app.models import Product as ProductModel, User as UserModel
 from app.models.enums import UserRole
 from app.schemas import Product, ProductCreate, ProductUpdate
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import require_standard_or_admin, can_access_product, can_edit_product, PermissionDenied
+from app.auth.permissions import require_standard_or_admin, can_access_product, can_edit_product, PermissionDenied, require_not_external_pentester
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -24,6 +24,8 @@ def list_products(
     Admin users see all products.
     Standard and read-only users see their own products and products they collaborate on.
     """
+    require_not_external_pentester(current_user)
+
     from sqlalchemy import or_
     from app.models import ProductCollaborator
 
@@ -55,6 +57,8 @@ def get_product(
     Admin users can access any product.
     Other users can access their own products and products they collaborate on.
     """
+    require_not_external_pentester(current_user)
+
     from sqlalchemy.orm import joinedload
 
     product = db.query(ProductModel).options(

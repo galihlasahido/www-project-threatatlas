@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 class InvitationCreate(BaseModel):
     """Schema for creating a new invitation."""
     email: EmailStr
-    role: Literal['admin', 'standard', 'read_only'] = 'standard'
+    role: Literal['admin', 'standard', 'read_only', 'external_pentester'] = 'standard'
 
 
 class InvitationAccept(BaseModel):
@@ -22,7 +22,7 @@ class InvitationResponse(BaseModel):
     """Schema for invitation response."""
     id: int
     email: EmailStr
-    role: Literal['admin', 'standard', 'read_only']
+    role: Literal['admin', 'standard', 'read_only', 'external_pentester']
     invited_by: int
     is_accepted: bool
     expires_at: datetime

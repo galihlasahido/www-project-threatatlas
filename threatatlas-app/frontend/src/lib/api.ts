@@ -187,4 +187,62 @@ export const reportsApi = {
   threatModel: (params: { product_id: number; diagram_id?: number }) => api.get('/reports/threat-model', { params }),
 };
 
+// Pentest API
+export const pentestsApi = {
+  list: (params?: { product_id?: number }) => api.get('/pentests', { params }),
+  get: (id: number) => api.get(`/pentests/${id}`),
+  create: (data: any) => api.post('/pentests', data),
+  update: (id: number, data: any) => api.put(`/pentests/${id}`, data),
+  delete: (id: number) => api.delete(`/pentests/${id}`),
+};
+
+// Pentest Findings API
+export const pentestFindingsApi = {
+  list: (params?: { pentest_id?: number; severity?: string; status?: string }) => api.get('/pentest-findings', { params }),
+  get: (id: number) => api.get(`/pentest-findings/${id}`),
+  create: (data: any) => api.post('/pentest-findings', data),
+  update: (id: number, data: any) => api.put(`/pentest-findings/${id}`, data),
+  delete: (id: number) => api.delete(`/pentest-findings/${id}`),
+  linkCWE: (findingId: number, cweId: number) => api.post(`/pentest-findings/${findingId}/cwes`, { cwe_id: cweId }),
+  unlinkCWE: (findingId: number, cweId: number) => api.delete(`/pentest-findings/${findingId}/cwes/${cweId}`),
+  linkCVE: (findingId: number, cveId: number) => api.post(`/pentest-findings/${findingId}/cves`, { cve_id: cveId }),
+  unlinkCVE: (findingId: number, cveId: number) => api.delete(`/pentest-findings/${findingId}/cves/${cveId}`),
+  linkThreat: (findingId: number, dtId: number) => api.post(`/pentest-findings/${findingId}/diagram-threats`, { diagram_threat_id: dtId }),
+  unlinkThreat: (findingId: number, dtId: number) => api.delete(`/pentest-findings/${findingId}/diagram-threats/${dtId}`),
+  listRetests: (findingId: number) => api.get(`/pentest-findings/${findingId}/retests`),
+  createRetest: (findingId: number, data: any) => api.post(`/pentest-findings/${findingId}/retests`, data),
+  deleteRetest: (findingId: number, retestId: number) => api.delete(`/pentest-findings/${findingId}/retests/${retestId}`),
+  uploadEvidence: (findingId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/pentest-findings/${findingId}/evidence/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  addNote: (findingId: number, content: string) => api.post(`/pentest-findings/${findingId}/evidence/note`, { note_content: content }),
+  deleteEvidence: (id: number) => api.delete(`/pentest-evidence/${id}`),
+};
+
+// Pentest Analytics & Reports
+export const pentestAnalyticsApi = {
+  summary: (params?: { product_id?: number }) => api.get('/analytics/pentest-summary', { params }),
+  vendorComparison: (params?: { product_id?: number }) => api.get('/analytics/vendor-comparison', { params }),
+};
+
+export const pentestReportsApi = {
+  generate: (params: { product_id: number; pentest_id?: number }) => api.get('/reports/pentest', { params }),
+};
+
+// Pentest Assignments API
+export const pentestAssignmentsApi = {
+  list: (pentestId: number) => api.get(`/pentests/${pentestId}/assignments`),
+  assign: (pentestId: number, userId: number) => api.post(`/pentests/${pentestId}/assign`, { user_id: userId }),
+  unassign: (pentestId: number, userId: number) => api.delete(`/pentests/${pentestId}/assign/${userId}`),
+};
+
+// Users API
+export const usersApi = {
+  list: () => api.get('/users'),
+};
+
 export default api;

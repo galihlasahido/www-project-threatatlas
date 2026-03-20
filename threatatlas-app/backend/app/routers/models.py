@@ -9,6 +9,7 @@ from app.models import Model as ModelDB, Framework, DiagramThreat, DiagramMitiga
 from app.models.model import ModelStatus
 from app.schemas.model import Model, ModelCreate, ModelUpdate, ModelWithFramework
 from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_not_external_pentester
 
 router = APIRouter(prefix="/models", tags=["models"])
 
@@ -20,6 +21,7 @@ def create_model(
     db: Session = Depends(get_db)
 ):
     """Create a new threat modeling model for a diagram."""
+    require_not_external_pentester(current_user)
     # Verify diagram exists
     diagram = db.query(Diagram).filter(Diagram.id == model_data.diagram_id).first()
     if not diagram:
@@ -72,6 +74,7 @@ def get_model(
     db: Session = Depends(get_db)
 ):
     """Get a specific model by ID."""
+    require_not_external_pentester(current_user)
     model = db.query(ModelDB).filter(ModelDB.id == model_id).first()
 
     if not model:
@@ -97,6 +100,7 @@ def list_diagram_models(
     db: Session = Depends(get_db)
 ):
     """List all models for a specific diagram."""
+    require_not_external_pentester(current_user)
     # Verify diagram exists
     diagram = db.query(Diagram).filter(Diagram.id == diagram_id).first()
     if not diagram:
@@ -130,6 +134,7 @@ def update_model(
     db: Session = Depends(get_db)
 ):
     """Update a model."""
+    require_not_external_pentester(current_user)
     model = db.query(ModelDB).filter(ModelDB.id == model_id).first()
 
     if not model:
@@ -177,6 +182,7 @@ def delete_model(
     Delete a model and all its associated threats and mitigations.
     This is a cascading delete.
     """
+    require_not_external_pentester(current_user)
     model = db.query(ModelDB).filter(ModelDB.id == model_id).first()
 
     if not model:
@@ -194,6 +200,7 @@ def list_all_models(
     db: Session = Depends(get_db)
 ):
     """List all models (for admin purposes)."""
+    require_not_external_pentester(current_user)
     models = db.query(ModelDB).all()
 
     # Enrich with framework info and counts

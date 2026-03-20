@@ -7,6 +7,7 @@ from app.models import User as UserModel, Threat as ThreatModel, CWE as CWEModel
 from app.schemas.cwe import CWE as CWESchema, CWEWithCVECount
 from app.schemas.cve import CVE as CVESchema
 from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_not_external_pentester
 from app.services.cwe_service import cwe_service
 
 router = APIRouter(prefix="/cwes", tags=["cwes"])
@@ -22,6 +23,7 @@ def list_cwes(
     db: Session = Depends(get_db),
 ):
     """List all CWEs with optional search and category filter."""
+    require_not_external_pentester(current_user)
     query = db.query(CWEModel)
 
     if search:
@@ -43,6 +45,7 @@ def get_cwe(
     db: Session = Depends(get_db),
 ):
     """Get a single CWE by database ID."""
+    require_not_external_pentester(current_user)
     cwe = db.query(CWEModel).filter(CWEModel.id == cwe_id).first()
     if not cwe:
         raise HTTPException(
@@ -59,6 +62,7 @@ def get_cves_for_cwe(
     db: Session = Depends(get_db),
 ):
     """Get CVEs related to a CWE."""
+    require_not_external_pentester(current_user)
     cwe = db.query(CWEModel).filter(CWEModel.id == cwe_id).first()
     if not cwe:
         raise HTTPException(
@@ -79,6 +83,7 @@ def get_cwes_for_threat(
     db: Session = Depends(get_db),
 ):
     """Get CWEs linked to a threat."""
+    require_not_external_pentester(current_user)
     threat = db.query(ThreatModel).filter(ThreatModel.id == threat_id).first()
     if not threat:
         raise HTTPException(

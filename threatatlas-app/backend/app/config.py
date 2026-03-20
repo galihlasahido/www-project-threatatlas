@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     invitation_expire_hours: int = 168  # 7 days
     frontend_url: str = "http://localhost:5173"
 
+    # Uploads
+    upload_base_path: str = "/app/uploads"
+    max_upload_size_mb: int = 10
+
     # NVD API
     nvd_api_key: str = ""
     nvd_api_base_url: str = "https://services.nvd.nist.gov/rest/json/cves/2.0"

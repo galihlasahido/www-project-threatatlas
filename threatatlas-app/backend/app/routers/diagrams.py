@@ -7,7 +7,7 @@ from app.models.enums import UserRole
 from app.schemas import Diagram, DiagramCreate, DiagramUpdate
 from app.services import VersionService
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import require_standard_or_admin, require_resource_access
+from app.auth.permissions import require_standard_or_admin, require_resource_access, require_not_external_pentester
 
 router = APIRouter(prefix="/diagrams", tags=["diagrams"])
 
@@ -26,6 +26,8 @@ def list_diagrams(
     Admin users see all diagrams.
     Other users see only diagrams from their own products.
     """
+    require_not_external_pentester(current_user)
+
     query = db.query(DiagramModel).join(ProductModel)
 
     # Admins see all diagrams, others see only their own
@@ -63,6 +65,8 @@ def get_diagram(
     Admin users can access any diagram.
     Other users can only access diagrams from their own products.
     """
+    require_not_external_pentester(current_user)
+
     diagram = db.query(DiagramModel).filter(DiagramModel.id == diagram_id).first()
     if not diagram:
         raise HTTPException(

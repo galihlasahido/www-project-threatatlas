@@ -5,7 +5,7 @@ from app.database import get_db
 from app.models import Framework as FrameworkModel, User as UserModel
 from app.schemas import Framework, FrameworkCreate, FrameworkUpdate
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import require_standard_or_admin
+from app.auth.permissions import require_standard_or_admin, require_not_external_pentester
 
 router = APIRouter(prefix="/frameworks", tags=["frameworks"])
 
@@ -18,6 +18,7 @@ def list_frameworks(
     db: Session = Depends(get_db)
 ):
     """List all frameworks."""
+    require_not_external_pentester(current_user)
     frameworks = db.query(FrameworkModel).offset(skip).limit(limit).all()
     return frameworks
 
@@ -29,6 +30,7 @@ def get_framework(
     db: Session = Depends(get_db)
 ):
     """Get a framework by ID."""
+    require_not_external_pentester(current_user)
     framework = db.query(FrameworkModel).filter(FrameworkModel.id == framework_id).first()
     if not framework:
         raise HTTPException(

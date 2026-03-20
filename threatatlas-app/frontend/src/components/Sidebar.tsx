@@ -11,6 +11,7 @@ import {
   Sun,
   LogOut,
   Users,
+  ShieldCheck,
 } from 'lucide-react';
 import PasswordChangeDialog from '@/components/PasswordChangeDialog';
 import {
@@ -40,7 +41,7 @@ const navigation = [
 export default function AppSidebar() {
   const location = useLocation();
   const { state } = useSidebar();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isExternalPentester } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
@@ -122,73 +123,115 @@ export default function AppSidebar() {
 
       {/* ── Main Navigation ──────────────────────────────────────── */}
       <SidebarContent className="py-4 px-2">
-        <SidebarGroup>
-          {!isCollapsed && (
-            <SidebarGroupLabel className="px-2 text-[10px] font-bold text-sidebar-foreground/40 tracking-widest mb-1">
-              NAVIGATION
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-0.5">
-              {navigation.map((item) => {
-                const isActive =
-                  location.pathname === item.href ||
-                  (item.href === '/products' &&
-                    location.pathname.startsWith('/products'));
-                return (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      className={navItemClass(isActive)}
-                      title={isCollapsed ? item.name : undefined}
-                    >
-                      <Link to={item.href} className="flex items-center gap-2.5 py-0.5">
-                        <item.icon className={navIconClass(isActive)} />
-                        {!isCollapsed && (
-                          <span className="text-sm">{item.name}</span>
-                        )}
-                        {isActive && !isCollapsed && (
-                          <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4/6 w-0.5 rounded-l-full bg-primary" />
-                        )}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Admin section */}
-        {isAdmin && (
-          <SidebarGroup className="mt-4">
+        {isExternalPentester ? (
+          /* Minimal nav for external pentesters */
+          <SidebarGroup>
             {!isCollapsed && (
               <SidebarGroupLabel className="px-2 text-[10px] font-bold text-sidebar-foreground/40 tracking-widest mb-1">
-                ADMIN
+                NAVIGATION
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === '/users'}
-                    className={navItemClass(location.pathname === '/users')}
-                    title={isCollapsed ? 'User Management' : undefined}
-                  >
-                    <Link to="/users" className="flex items-center gap-2.5 py-0.5">
-                      <Users className={navIconClass(location.pathname === '/users')} />
-                      {!isCollapsed && <span className="text-sm">User Management</span>}
-                      {location.pathname === '/users' && !isCollapsed && (
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4/6 w-0.5 rounded-l-full bg-primary" />
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+              <SidebarMenu className="space-y-0.5">
+                {(() => {
+                  const isActive = location.pathname === '/my-pentests' || location.pathname.startsWith('/pentests/');
+                  return (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={navItemClass(isActive)}
+                        title={isCollapsed ? 'My Pentests' : undefined}
+                      >
+                        <Link to="/my-pentests" className="flex items-center gap-2.5 py-0.5">
+                          <ShieldCheck className={navIconClass(isActive)} />
+                          {!isCollapsed && (
+                            <span className="text-sm">My Pentests</span>
+                          )}
+                          {isActive && !isCollapsed && (
+                            <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4/6 w-0.5 rounded-l-full bg-primary" />
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })()}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+        ) : (
+          <>
+            <SidebarGroup>
+              {!isCollapsed && (
+                <SidebarGroupLabel className="px-2 text-[10px] font-bold text-sidebar-foreground/40 tracking-widest mb-1">
+                  NAVIGATION
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu className="space-y-0.5">
+                  {navigation.map((item) => {
+                    const isActive =
+                      location.pathname === item.href ||
+                      (item.href === '/products' &&
+                        location.pathname.startsWith('/products')) ||
+                      (item.href === '/pentests' &&
+                        location.pathname.startsWith('/pentests'));
+                    return (
+                      <SidebarMenuItem key={item.name}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          className={navItemClass(isActive)}
+                          title={isCollapsed ? item.name : undefined}
+                        >
+                          <Link to={item.href} className="flex items-center gap-2.5 py-0.5">
+                            <item.icon className={navIconClass(isActive)} />
+                            {!isCollapsed && (
+                              <span className="text-sm">{item.name}</span>
+                            )}
+                            {isActive && !isCollapsed && (
+                              <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4/6 w-0.5 rounded-l-full bg-primary" />
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* Admin section */}
+            {isAdmin && (
+              <SidebarGroup className="mt-4">
+                {!isCollapsed && (
+                  <SidebarGroupLabel className="px-2 text-[10px] font-bold text-sidebar-foreground/40 tracking-widest mb-1">
+                    ADMIN
+                  </SidebarGroupLabel>
+                )}
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={location.pathname === '/users'}
+                        className={navItemClass(location.pathname === '/users')}
+                        title={isCollapsed ? 'User Management' : undefined}
+                      >
+                        <Link to="/users" className="flex items-center gap-2.5 py-0.5">
+                          <Users className={navIconClass(location.pathname === '/users')} />
+                          {!isCollapsed && <span className="text-sm">User Management</span>}
+                          {location.pathname === '/users' && !isCollapsed && (
+                            <div className="absolute right-0 top-1/2 -translate-y-1/2 h-4/6 w-0.5 rounded-l-full bg-primary" />
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
+          </>
         )}
       </SidebarContent>
 

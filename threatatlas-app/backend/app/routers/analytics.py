@@ -6,9 +6,11 @@ from app.database import get_db
 from app.models import (
     DiagramThreat, DiagramMitigation, Threat, Diagram, Product,
     TechnologyStack, CVE, CVECPE, User as UserModel,
+    Pentest, PentestFinding,
 )
 from app.models.enums import UserRole
 from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_not_external_pentester
 from app.schemas.analytics import (
     AnalyticsSummary,
     RiskHeatmapCell,
@@ -16,6 +18,10 @@ from app.schemas.analytics import (
     StatusDistribution,
     SeverityDistribution,
     TechVulnerabilitySummary,
+    PentestAnalyticsSummary,
+    VendorComparisonItem,
+    RiskMatrixCell,
+    RemediationTimelineItem,
 )
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -65,6 +71,7 @@ def get_analytics_summary(
     db: Session = Depends(get_db),
 ):
     """Get an aggregated analytics summary of threats and mitigations."""
+    require_not_external_pentester(current_user)
     # Total threats
     threat_q = _base_threat_query(db, current_user, product_id, diagram_id, model_id)
     total_threats = threat_q.count()
@@ -147,6 +154,7 @@ def get_risk_heatmap(
     db: Session = Depends(get_db),
 ):
     """Get risk heatmap data grouped by likelihood and impact."""
+    require_not_external_pentester(current_user)
     query = (
         db.query(
             DiagramThreat.likelihood,
@@ -180,6 +188,7 @@ def get_category_distribution(
     db: Session = Depends(get_db),
 ):
     """Get threat distribution by category (from Threat definitions)."""
+    require_not_external_pentester(current_user)
     query = (
         db.query(Threat.category, func.count(DiagramThreat.id).label("count"))
         .join(Threat, DiagramThreat.threat_id == Threat.id)
@@ -209,6 +218,7 @@ def get_status_distribution(
     db: Session = Depends(get_db),
 ):
     """Get threat distribution by status."""
+    require_not_external_pentester(current_user)
     query = (
         db.query(DiagramThreat.status, func.count(DiagramThreat.id).label("count"))
         .join(Diagram, DiagramThreat.diagram_id == Diagram.id)
@@ -237,6 +247,7 @@ def get_severity_distribution(
     db: Session = Depends(get_db),
 ):
     """Get threat distribution by severity."""
+    require_not_external_pentester(current_user)
     query = (
         db.query(DiagramThreat.severity, func.count(DiagramThreat.id).label("count"))
         .join(Diagram, DiagramThreat.diagram_id == Diagram.id)
@@ -263,6 +274,7 @@ def get_cve_severity_distribution(
     db: Session = Depends(get_db),
 ):
     """Get CVE distribution by severity for technologies used in a product's diagrams."""
+    require_not_external_pentester(current_user)
     # Get tech stacks for the product's diagrams
     tech_query = db.query(TechnologyStack).join(Diagram, TechnologyStack.diagram_id == Diagram.id).join(Product, Diagram.product_id == Product.id)
 
@@ -299,6 +311,172 @@ def get_cve_severity_distribution(
     return [SeverityDistribution(severity=sev, count=cnt) for sev, cnt in rows]
 
 
+@router.get("/pentest-summary", response_model=PentestAnalyticsSummary)
+def get_pentest_summary(
+    product_id: int | None = None,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get aggregated pentest analytics summary."""
+    require_not_external_pentester(current_user)
+    from datetime import datetime
+    from collections import defaultdict
+
+    # Base query for pentests
+    pt_query = db.query(Pentest).join(Product, Pentest.product_id == Product.id)
+    if current_user.role != UserRole.ADMIN.value:
+        pt_query = pt_query.filter(Product.user_id == current_user.id)
+    if product_id is not None:
+        pt_query = pt_query.filter(Pentest.product_id == product_id)
+    total_pentests = pt_query.count()
+
+    # Base query for findings
+    f_query = (
+        db.query(PentestFinding)
+        .join(Pentest, PentestFinding.pentest_id == Pentest.id)
+        .join(Product, Pentest.product_id == Product.id)
+    )
+    if current_user.role != UserRole.ADMIN.value:
+        f_query = f_query.filter(Product.user_id == current_user.id)
+    if product_id is not None:
+        f_query = f_query.filter(Pentest.product_id == product_id)
+
+    findings = f_query.all()
+    total_findings = len(findings)
+
+    by_severity = {}
+    by_status = {}
+    open_count = 0
+    closed_count = 0
+    remediation_days = []
+    cvss_scores = []
+    priority_counts = defaultdict(int)
+    risk_matrix_map = defaultdict(int)
+    timeline_found = defaultdict(int)
+    timeline_fixed = defaultdict(int)
+
+    for f in findings:
+        by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
+        by_status[f.status] = by_status.get(f.status, 0) + 1
+
+        if f.status in ("open", "in_progress"):
+            open_count += 1
+        else:
+            closed_count += 1
+
+        if f.patch_date and f.created_at:
+            delta = f.patch_date - f.created_at
+            remediation_days.append(delta.total_seconds() / 86400)
+
+        # CVSS scores
+        if f.cvss_score is not None:
+            cvss_scores.append(f.cvss_score)
+
+        # Priority breakdown
+        if f.remediation_priority:
+            priority_counts[f.remediation_priority] += 1
+
+        # Risk matrix: likelihood x severity
+        if f.likelihood and f.severity:
+            risk_matrix_map[(f.likelihood, f.severity)] += 1
+
+        # Remediation timeline by month
+        if f.created_at:
+            month_key = f.created_at.strftime("%Y-%m")
+            timeline_found[month_key] += 1
+        if f.patch_date:
+            fix_month = f.patch_date.strftime("%Y-%m")
+            timeline_fixed[fix_month] += 1
+
+    mean_time_to_remediate = round(sum(remediation_days) / len(remediation_days), 2) if remediation_days else None
+
+    # Health score: 100 - critical*10 - high*5 - medium*2 - low*0.5 for open findings
+    open_findings_list = [f for f in findings if f.status in ("open", "in_progress")]
+    penalty = 0.0
+    for f in open_findings_list:
+        if f.severity == "critical":
+            penalty += 10
+        elif f.severity == "high":
+            penalty += 5
+        elif f.severity == "medium":
+            penalty += 2
+        elif f.severity == "low":
+            penalty += 0.5
+    health_score = max(0.0, min(100.0, 100 - penalty))
+
+    # Build risk matrix list
+    risk_matrix = [
+        RiskMatrixCell(likelihood=lk, severity=sv, count=cnt)
+        for (lk, sv), cnt in risk_matrix_map.items()
+    ]
+
+    # Build remediation timeline
+    all_months = sorted(set(list(timeline_found.keys()) + list(timeline_fixed.keys())))
+    remediation_timeline = [
+        RemediationTimelineItem(month=m, found=timeline_found.get(m, 0), fixed=timeline_fixed.get(m, 0))
+        for m in all_months
+    ]
+
+    # Average CVSS score
+    avg_cvss = round(sum(cvss_scores) / len(cvss_scores), 2) if cvss_scores else None
+
+    return PentestAnalyticsSummary(
+        total_pentests=total_pentests,
+        total_findings=total_findings,
+        findings_by_severity=by_severity,
+        findings_by_status=by_status,
+        open_findings=open_count,
+        closed_findings=closed_count,
+        mean_time_to_remediate_days=mean_time_to_remediate,
+        health_score=round(health_score, 2),
+        risk_matrix=risk_matrix,
+        remediation_timeline=remediation_timeline,
+        priority_breakdown=dict(priority_counts),
+        avg_cvss_score=avg_cvss,
+    )
+
+
+@router.get("/vendor-comparison", response_model=list[VendorComparisonItem])
+def get_vendor_comparison(
+    product_id: int | None = None,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Compare pentest vendors by finding counts and severity breakdown."""
+    require_not_external_pentester(current_user)
+    pt_query = db.query(Pentest).join(Product, Pentest.product_id == Product.id)
+    if current_user.role != UserRole.ADMIN.value:
+        pt_query = pt_query.filter(Product.user_id == current_user.id)
+    if product_id is not None:
+        pt_query = pt_query.filter(Pentest.product_id == product_id)
+
+    pentests = pt_query.all()
+
+    vendor_map: dict[str, dict] = {}
+    for pt in pentests:
+        vendor_key = pt.vendor_name or pt.vendor_type or "Unknown"
+        if vendor_key not in vendor_map:
+            vendor_map[vendor_key] = {
+                "vendor_name": vendor_key,
+                "vendor_type": pt.vendor_type,
+                "pentest_count": 0,
+                "total_findings": 0,
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0,
+            }
+        vendor_map[vendor_key]["pentest_count"] += 1
+
+        findings = db.query(PentestFinding).filter(PentestFinding.pentest_id == pt.id).all()
+        vendor_map[vendor_key]["total_findings"] += len(findings)
+        for f in findings:
+            if f.severity in ("critical", "high", "medium", "low"):
+                vendor_map[vendor_key][f.severity] += 1
+
+    return [VendorComparisonItem(**v) for v in vendor_map.values()]
+
+
 @router.get("/tech-vulnerability", response_model=list[TechVulnerabilitySummary])
 def get_tech_vulnerability_summary(
     product_id: int | None = None,
@@ -307,6 +485,7 @@ def get_tech_vulnerability_summary(
     db: Session = Depends(get_db),
 ):
     """Get vulnerability summary per technology stack entry."""
+    require_not_external_pentester(current_user)
     tech_query = db.query(TechnologyStack).join(Diagram, TechnologyStack.diagram_id == Diagram.id).join(Product, Diagram.product_id == Product.id)
 
     if current_user.role != UserRole.ADMIN.value:

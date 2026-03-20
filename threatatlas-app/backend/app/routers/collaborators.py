@@ -16,6 +16,7 @@ from app.schemas.collaborator import (
     CollaboratorWithDetails
 )
 from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_not_external_pentester
 from app.models.enums import CollaboratorRole
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,8 @@ def list_collaborators(
     Raises:
         HTTPException: If product not found or user not authorized
     """
+    require_not_external_pentester(current_user)
+
     product = db.query(ProductModel).options(
         joinedload(ProductModel.collaborators)
     ).filter(ProductModel.id == product_id).first()
@@ -125,6 +128,8 @@ def add_collaborator(
     Raises:
         HTTPException: If not authorized, user not found, or already a collaborator
     """
+    require_not_external_pentester(current_user)
+
     product = db.query(ProductModel).options(
         joinedload(ProductModel.collaborators)
     ).filter(ProductModel.id == product_id).first()
@@ -226,6 +231,8 @@ def update_collaborator(
     Raises:
         HTTPException: If not authorized or collaborator not found
     """
+    require_not_external_pentester(current_user)
+
     product = db.query(ProductModel).options(
         joinedload(ProductModel.collaborators)
     ).filter(ProductModel.id == product_id).first()
@@ -299,6 +306,8 @@ def remove_collaborator(
     Raises:
         HTTPException: If not authorized or collaborator not found
     """
+    require_not_external_pentester(current_user)
+
     product = db.query(ProductModel).options(
         joinedload(ProductModel.collaborators)
     ).filter(ProductModel.id == product_id).first()

@@ -12,7 +12,7 @@ from app.schemas.technology_stack import (
 )
 from app.schemas.cve import CVE as CVESchema
 from app.auth.dependencies import get_current_user
-from app.auth.permissions import require_standard_or_admin, require_resource_access
+from app.auth.permissions import require_standard_or_admin, require_resource_access, require_not_external_pentester
 from app.models.enums import UserRole
 from app.services.cve_service import cve_service
 
@@ -36,6 +36,7 @@ def list_technology_stacks_for_diagram(
     db: Session = Depends(get_db),
 ):
     """List all technology stacks for a diagram."""
+    require_not_external_pentester(current_user)
     diagram = (
         db.query(DiagramModel)
         .options(joinedload(DiagramModel.product))
@@ -66,6 +67,7 @@ def list_technology_stacks_for_element(
     db: Session = Depends(get_db),
 ):
     """List technology stacks for a specific element in a diagram."""
+    require_not_external_pentester(current_user)
     return (
         db.query(TechnologyStackModel)
         .filter(
@@ -213,6 +215,7 @@ def get_cves_for_technology_stack(
     db: Session = Depends(get_db),
 ):
     """Get matched CVEs for a specific technology stack entry."""
+    require_not_external_pentester(current_user)
     db_tech = (
         db.query(TechnologyStackModel)
         .filter(TechnologyStackModel.id == id)
