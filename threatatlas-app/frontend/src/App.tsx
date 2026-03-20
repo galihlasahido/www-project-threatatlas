@@ -6,6 +6,8 @@ import Products from '@/pages/Products';
 import ProductDetails from '@/pages/ProductDetails';
 import Diagrams from '@/pages/Diagrams';
 import KnowledgeBase from '@/pages/KnowledgeBase';
+import Analytics from '@/pages/Analytics';
+import Reports from '@/pages/Reports';
 import Login from '@/pages/Login';
 import AcceptInvitation from '@/pages/AcceptInvitation';
 import UserManagement from '@/pages/UserManagement';
@@ -26,6 +28,8 @@ function HeaderBreadcrumb() {
       case '/products': return { title: 'Products', subtitle: 'Manage security products' };
       case '/diagrams': return { title: 'Diagrams', subtitle: 'Threat modeling canvas' };
       case '/knowledge': return { title: 'Knowledge Base', subtitle: 'Threats & mitigations' };
+      case '/analytics': return { title: 'Analytics', subtitle: 'Threat analytics & insights' };
+      case '/reports': return { title: 'Reports', subtitle: 'Generate threat model reports' };
       case '/users': return { title: 'User Management', subtitle: 'Manage users and invitations' };
       default: return { title: 'ThreatAtlas', subtitle: 'Security platform' };
     }
@@ -65,6 +69,8 @@ function AppContent() {
             <Route path="/products/:productId" element={<ProductDetails />} />
             <Route path="/diagrams" element={<Diagrams />} />
             <Route path="/knowledge" element={<KnowledgeBase />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/users" element={<UserManagement />} />
           </Routes>
         </main>

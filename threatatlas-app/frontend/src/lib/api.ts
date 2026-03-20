@@ -171,4 +171,20 @@ export const technologyStacksApi = {
   getCVEs: (id: number) => api.get(`/technology-stacks/${id}/cves`),
 };
 
+// Analytics API
+export const analyticsApi = {
+  summary: (params?: { product_id?: number; diagram_id?: number; model_id?: number }) => api.get('/analytics/summary', { params }),
+  riskHeatmap: (params?: { product_id?: number; diagram_id?: number; model_id?: number }) => api.get('/analytics/risk-heatmap', { params }),
+  categoryDistribution: (params?: { product_id?: number; diagram_id?: number; model_id?: number }) => api.get('/analytics/category-distribution', { params }),
+  statusDistribution: (params?: { product_id?: number; diagram_id?: number; model_id?: number }) => api.get('/analytics/status-distribution', { params }),
+  severityDistribution: (params?: { product_id?: number; diagram_id?: number; model_id?: number }) => api.get('/analytics/severity-distribution', { params }),
+  cveSeverity: (params?: { product_id?: number }) => api.get('/analytics/cve-severity', { params }),
+  techVulnerability: (params?: { product_id?: number; diagram_id?: number }) => api.get('/analytics/tech-vulnerability', { params }),
+};
+
+// Reports API
+export const reportsApi = {
+  threatModel: (params: { product_id: number; diagram_id?: number }) => api.get('/reports/threat-model', { params }),
+};
+
 export default api;

@@ -1,7 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
+  BarChart3,
   Box,
+  FileText,
   LayoutDashboard,
   Library,
   Network,
@@ -30,6 +32,8 @@ import { useAuth } from '@/contexts/AuthContext';
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Products', href: '/products', icon: Box },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Knowledge Base', href: '/knowledge', icon: Library },
 ];
 

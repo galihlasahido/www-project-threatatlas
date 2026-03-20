@@ -26,6 +26,8 @@ from app.routers import (
     cwes,
     cves,
     technology_stacks,
+    analytics,
+    reports,
 )
 
 
@@ -72,6 +74,8 @@ app.include_router(cwes.threat_cwe_router, prefix="/api")
 app.include_router(cves.router, prefix="/api")
 app.include_router(cves.diagram_cve_router, prefix="/api")
 app.include_router(technology_stacks.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 
 
 @app.get("/")
